@@ -13,7 +13,7 @@ fn main()
     args.remove(0);
     if args.is_empty()
     {
-        std::process::exit(1);
+        return;
     }
     let mut stdout = stdout();
     print!("\x1B[K\x1B[J");
@@ -194,18 +194,18 @@ fn main()
                 {
                     line -= 1;
                     print!("\x1B[A");
-                    if placement == 0
+                    if placement != 0
                     {
-                    }
-                    else if lines[line].len() > cursor
-                    {
-                        print!("\x1b[G\x1b[{}C", cursor);
-                        placement = cursor;
-                    }
-                    else if placement < cursor || lines[line].len() < placement
-                    {
-                        print!("\x1b[G\x1b[{}C", lines[line].len());
-                        placement = lines[line].len();
+                        if lines[line].len() > cursor
+                        {
+                            print!("\x1b[G\x1b[{}C", cursor);
+                            placement = cursor;
+                        }
+                        else if placement < cursor || lines[line].len() < placement
+                        {
+                            print!("\x1b[G\x1b[{}C", lines[line].len());
+                            placement = lines[line].len();
+                        }
                     }
                 }
             }
@@ -290,7 +290,7 @@ fn main()
                     {
                         clip = lines.remove(line);
                         print!(
-                            "\x1b[J{}\n\x1B[{}A",
+                            "\x1b[G\x1b[J{}\n\x1B[{}A",
                             lines[line..]
                                 .iter()
                                 .map(|vec| vec.iter().collect::<String>())
@@ -299,6 +299,10 @@ fn main()
                                 .replace('\t', " "),
                             lines.len() - line
                         )
+                    }
+                    if lines.is_empty()
+                    {
+                        lines.push(vec![]);
                     }
                 }
                 else if c == 'p'
