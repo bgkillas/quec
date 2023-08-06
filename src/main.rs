@@ -19,7 +19,7 @@ fn main()
     stdout.flush().unwrap();
     let mut lines = if File::open(&args[0]).is_err()
     {
-        vec![]
+        Vec::new()
     }
     else
     {
@@ -198,7 +198,7 @@ fn main()
                 {
                     line -= 1;
                     print!("\x1B[A");
-                    if placement != 0
+                    if cursor != 0
                     {
                         if lines[line].len() > cursor
                         {
@@ -216,22 +216,31 @@ fn main()
             '\x1E' =>
             {
                 //down
+                if line + 1 == lines.len() && !lines[line].is_empty()
+                {
+                    lines.push(Vec::new());
+                }
                 if line + 1 != lines.len()
                 {
                     line += 1;
                     print!("\x1B[B");
-                    if placement == 0
+                    if lines[line].is_empty()
                     {
+                        print!("\x1b[G");
+                        placement = 0;
                     }
-                    else if lines[line].len() > cursor
+                    else if placement != 0
                     {
-                        print!("\x1b[G\x1b[{}C", cursor);
-                        placement = cursor;
-                    }
-                    else if placement < cursor || lines[line].len() < placement
-                    {
-                        print!("\x1b[G\x1b[{}C", lines[line].len());
-                        placement = lines[line].len();
+                        if lines[line].len() > cursor
+                        {
+                            print!("\x1b[G\x1b[{}C", cursor);
+                            placement = cursor;
+                        }
+                        else if placement < cursor || lines[line].len() < placement
+                        {
+                            print!("\x1b[G\x1b[{}C", lines[line].len());
+                            placement = lines[line].len();
+                        }
                     }
                 }
             }
@@ -293,28 +302,43 @@ fn main()
                 }
                 else if c == 'd'
                 {
-                    if line != lines.len()
+                    if !lines.is_empty()
                     {
-                        clip = lines.remove(line);
-                        print!(
-                            "\x1b[G\x1b[J{}\n\x1B[{}A",
-                            lines[line..]
-                                .iter()
-                                .map(|vec| vec.iter().collect::<String>())
-                                .collect::<Vec<String>>()
-                                .join("\n")
-                                .replace('\t', " "),
-                            lines.len() - line
-                        )
-                    }
-                    if lines.is_empty()
-                    {
-                        lines.push(vec![]);
+                        if line + 1 == lines.len()
+                        {
+                            clip = lines.remove(line);
+                            line -= 1;
+                            placement = 0;
+                            cursor = 0;
+                            print!("\x1b[K\x1b[A");
+                        }
+                        else
+                        {
+                            clip = lines.remove(line);
+                            placement = 0;
+                            cursor = 0;
+                            print!(
+                                "\x1b[G\x1b[J{}\n\x1B[{}A",
+                                lines[line..]
+                                    .iter()
+                                    .map(|vec| vec.iter().collect::<String>())
+                                    .collect::<Vec<String>>()
+                                    .join("\n")
+                                    .replace('\t', " "),
+                                lines.len() - line
+                            )
+                        }
+                        if lines.is_empty()
+                        {
+                            lines.push(Vec::new());
+                        }
                     }
                 }
                 else if c == 'p'
                 {
                     lines.insert(line, clip.clone());
+                    placement = 0;
+                    cursor = 0;
                     print!(
                         "\x1b[J{}\n\x1B[{}A",
                         lines[line..]
