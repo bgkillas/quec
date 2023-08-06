@@ -15,17 +15,20 @@ fn main()
     {
         std::process::exit(1);
     }
-    if File::open(&args[0]).is_err()
-    {
-        File::create(&args[0]).unwrap();
-    }
     let mut stdout = stdout();
     print!("\x1B[K\x1B[J");
     stdout.flush().unwrap();
-    let mut lines = BufReader::new(File::open(&args[0]).unwrap())
-        .lines()
-        .map(|l| l.unwrap().chars().collect::<Vec<char>>())
-        .collect::<Vec<Vec<char>>>();
+    let mut lines = if File::open(&args[0]).is_err()
+    {
+        vec![]
+    }
+    else
+    {
+        BufReader::new(File::open(&args[0]).unwrap())
+            .lines()
+            .map(|l| l.unwrap().chars().collect::<Vec<char>>())
+            .collect::<Vec<Vec<char>>>()
+    };
     //TODO word wrapping and support files longer then screen
     let (height, _width) = get_dimensions();
     if lines.is_empty()
@@ -65,6 +68,7 @@ fn main()
     let mut edit = false;
     let mut clip = Vec::new();
     let mut result: Vec<u8>;
+    let mut cursor = 0;
     //let mut start = 0;
     //let mut end = 0;
     //let mut top = 0;
@@ -99,6 +103,7 @@ fn main()
                 }
                 line += 1;
                 placement = 0;
+                cursor = placement;
             }
             '\x08' =>
             {
@@ -141,6 +146,7 @@ fn main()
                         );
                     }
                 }
+                cursor = placement;
             }
             '\x1B' =>
             {
@@ -160,21 +166,26 @@ fn main()
                     placement -= 1;
                     print!("\x1B[D",);
                 }
+                cursor = placement;
             }
             '\x1C' =>
             {
                 //right
                 if placement == lines[line].len()
                 {
-                    println!();
-                    placement = 0;
-                    line += 1;
+                    if line + 1 != lines.len()
+                    {
+                        println!();
+                        placement = 0;
+                        line += 1;
+                    }
                 }
                 else
                 {
                     print!("\x1b[C",);
                     placement += 1;
                 }
+                cursor = placement;
             }
             '\x1D' =>
             {
@@ -183,26 +194,41 @@ fn main()
                 {
                     line -= 1;
                     print!("\x1B[A");
-                }
-                if lines[line].len() < placement
-                {
-                    let len = lines[line].len();
-                    lines[line].extend(vec![' '; placement - len])
+                    if placement == 0
+                    {
+                    }
+                    else if lines[line].len() > cursor
+                    {
+                        print!("\x1b[G\x1b[{}C", cursor);
+                        placement = cursor;
+                    }
+                    else if placement < cursor || lines[line].len() < placement
+                    {
+                        print!("\x1b[G\x1b[{}C", lines[line].len());
+                        placement = lines[line].len();
+                    }
                 }
             }
             '\x1E' =>
             {
                 //down
-                if line + 1 == lines.len()
+                if line + 1 != lines.len()
                 {
-                    lines.push(Vec::new());
-                }
-                line += 1;
-                print!("\x1B[B");
-                if lines[line].len() < placement
-                {
-                    let len = lines[line].len();
-                    lines[line].extend(vec![' '; placement - len])
+                    line += 1;
+                    print!("\x1B[B");
+                    if placement == 0
+                    {
+                    }
+                    else if lines[line].len() > cursor
+                    {
+                        print!("\x1b[G\x1b[{}C", cursor);
+                        placement = cursor;
+                    }
+                    else if placement < cursor || lines[line].len() < placement
+                    {
+                        print!("\x1b[G\x1b[{}C", lines[line].len());
+                        placement = lines[line].len();
+                    }
                 }
             }
             '\x1A' => edit = false,
@@ -226,6 +252,7 @@ fn main()
                         }
                     );
                     placement += 1;
+                    cursor = placement;
                 }
                 else if c == 'w'
                 {
@@ -259,17 +286,20 @@ fn main()
                 }
                 else if c == 'd'
                 {
-                    clip = lines.remove(line);
-                    print!(
-                        "\x1b[J{}\n\x1B[{}A",
-                        lines[line..]
-                            .iter()
-                            .map(|vec| vec.iter().collect::<String>())
-                            .collect::<Vec<String>>()
-                            .join("\n")
-                            .replace('\t', " "),
-                        lines.len() - line
-                    )
+                    if line != lines.len()
+                    {
+                        clip = lines.remove(line);
+                        print!(
+                            "\x1b[J{}\n\x1B[{}A",
+                            lines[line..]
+                                .iter()
+                                .map(|vec| vec.iter().collect::<String>())
+                                .collect::<Vec<String>>()
+                                .join("\n")
+                                .replace('\t', " "),
+                            lines.len() - line
+                        )
+                    }
                 }
                 else if c == 'p'
                 {
@@ -294,8 +324,14 @@ fn main()
                         c = read_single_char();
                         match c
                         {
-                            '\n' =>
+                            '\x1A' => break,
+                            _ =>
                             {
+                                if c != '\n'
+                                {
+                                    ln = (0, 0);
+                                    word.push(c);
+                                }
                                 'inner: for (l, i) in lines[ln.0..].iter().enumerate()
                                 {
                                     if word.len() < i.len()
@@ -307,7 +343,7 @@ fn main()
                                             {
                                                 ln = (l + ln.0, j);
                                                 print!(
-                                                    "\x1b[H{}{}",
+                                                    "{}{}",
                                                     match line.cmp(&ln.0)
                                                     {
                                                         Ordering::Less =>
@@ -342,62 +378,7 @@ fn main()
                                                     }
                                                 );
                                                 stdout.flush().unwrap();
-                                                break 'inner;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            '\x1A' => break,
-                            _ =>
-                            {
-                                ln = (0, 0);
-                                word.push(c);
-                                'inner: for (l, i) in lines.iter().enumerate()
-                                {
-                                    if word.len() < i.len()
-                                    {
-                                        for j in 0..=(i.len() - word.len())
-                                        {
-                                            if i[j..j + word.len()] == word
-                                            {
-                                                ln = (l, j);
-                                                print!(
-                                                    "\x1b[H{}{}",
-                                                    match line.cmp(&l)
-                                                    {
-                                                        Ordering::Less =>
-                                                        {
-                                                            "\x1B[".to_owned()
-                                                                + &(l - line).to_string()
-                                                                + "B"
-                                                        }
-                                                        Ordering::Greater =>
-                                                        {
-                                                            "\x1B[".to_owned()
-                                                                + &(line - l).to_string()
-                                                                + "A"
-                                                        }
-                                                        Ordering::Equal => "".to_string(),
-                                                    },
-                                                    match placement.cmp(&j)
-                                                    {
-                                                        Ordering::Less =>
-                                                        {
-                                                            "\x1B[".to_owned()
-                                                                + &(j - placement).to_string()
-                                                                + "C"
-                                                        }
-                                                        Ordering::Greater =>
-                                                        {
-                                                            "\x1B[".to_owned()
-                                                                + &(placement - j).to_string()
-                                                                + "D"
-                                                        }
-                                                        Ordering::Equal => "".to_string(),
-                                                    }
-                                                );
-                                                stdout.flush().unwrap();
+                                                (line, placement) = ln;
                                                 break 'inner;
                                             }
                                         }
