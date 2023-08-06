@@ -1,7 +1,6 @@
 use console::{Key, Term};
 use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 use std::{
-    cmp::Ordering,
     env::args,
     fs::File,
     io::{stdout, BufRead, BufReader, Write},
@@ -26,7 +25,12 @@ fn main()
     {
         BufReader::new(File::open(&args[0]).unwrap())
             .lines()
-            .map(|l| l.unwrap().chars().collect::<Vec<char>>())
+            .map(|l| {
+                l.unwrap()
+                    .chars()
+                    .filter(|c| c.is_ascii_graphic() || c == &' ' || c == &'\t' || c == &'\n')
+                    .collect::<Vec<char>>()
+            })
             .collect::<Vec<Vec<char>>>()
     };
     //TODO word wrapping and support files longer then screen
@@ -239,7 +243,10 @@ fn main()
                     lines[line].insert(placement, c);
                     print!(
                         "\x1B[K{}{}",
-                        lines[line][placement..].iter().collect::<String>(),
+                        lines[line][placement..]
+                            .iter()
+                            .collect::<String>()
+                            .replace('\t', " "),
                         if lines[line].len() - 1 == placement
                         {
                             "".to_string()
@@ -336,56 +343,46 @@ fn main()
                                     ln = (0, 0);
                                     word.push(c);
                                 }
-                                'inner: for (l, i) in lines[ln.0..].iter().enumerate()
+                                'inner: for (l, i) in lines.iter().enumerate()
                                 {
-                                    if word.len() < i.len()
+                                    if (l > ln.0 || ln.0 == 0) && word.len() < i.len()
                                     {
                                         for j in if l == 0 { ln.1 + 1 } else { 0 }
                                             ..=(i.len() - word.len())
                                         {
                                             if i[j..j + word.len()] == word
                                             {
-                                                ln = (l + ln.0, j);
+                                                ln = (l, j);
                                                 print!(
-                                                    "{}{}",
-                                                    match line.cmp(&ln.0)
+                                                    "\x1B[H{}{}",
+                                                    if ln.0 == 0
                                                     {
-                                                        Ordering::Less =>
-                                                        {
-                                                            "\x1B[".to_owned()
-                                                                + &(ln.0 - line).to_string()
-                                                                + "B"
-                                                        }
-                                                        Ordering::Greater =>
-                                                        {
-                                                            "\x1B[".to_owned()
-                                                                + &(line - ln.0).to_string()
-                                                                + "A"
-                                                        }
-                                                        Ordering::Equal => "".to_string(),
-                                                    },
-                                                    match placement.cmp(&j)
-                                                    {
-                                                        Ordering::Less =>
-                                                        {
-                                                            "\x1B[".to_owned()
-                                                                + &(j - placement).to_string()
-                                                                + "C"
-                                                        }
-                                                        Ordering::Greater =>
-                                                        {
-                                                            "\x1B[".to_owned()
-                                                                + &(placement - j).to_string()
-                                                                + "D"
-                                                        }
-                                                        Ordering::Equal => "".to_string(),
+                                                        "".to_string()
                                                     }
+                                                    else
+                                                    {
+                                                        "\x1B[".to_owned()
+                                                            + ln.0.to_string().as_str()
+                                                            + "B"
+                                                    },
+                                                    if ln.1 == 0
+                                                    {
+                                                        "".to_string()
+                                                    }
+                                                    else
+                                                    {
+                                                        "\x1B[".to_owned()
+                                                            + ln.1.to_string().as_str()
+                                                            + "C"
+                                                    },
                                                 );
                                                 stdout.flush().unwrap();
                                                 (line, placement) = ln;
+                                                cursor = placement;
                                                 break 'inner;
                                             }
                                         }
+                                        ln = (0, 0);
                                     }
                                 }
                             }
