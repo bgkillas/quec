@@ -266,6 +266,38 @@ search mode:\n\
                     }
                     cursor = placement;
                 }
+                '\x01' =>
+                {
+                    //home
+                    placement = 0;
+                    line = 0;
+                    print!("\x1b[H");
+                }
+                '\x02' =>
+                {
+                    //end
+                    line = lines.len() - 1;
+                    placement = lines[line].len();
+                    print!(
+                        "\x1b[H{}{}",
+                        if line == 0
+                        {
+                            "".to_string()
+                        }
+                        else
+                        {
+                            "\x1B[".to_owned() + &line.to_string() + "B"
+                        },
+                        if placement == 0
+                        {
+                            "".to_string()
+                        }
+                        else
+                        {
+                            "\x1B[".to_owned() + &placement.to_string() + "C"
+                        }
+                    );
+                }
                 '\x1B' =>
                 {
                     //left
@@ -818,6 +850,8 @@ fn read_single_char() -> char
         Key::Enter => '\n',
         Key::Backspace => '\x08',
         Key::ArrowLeft => '\x1B',
+        Key::Home => '\x01',
+        Key::End => '\x02',
         Key::ArrowRight => '\x1C',
         Key::ArrowUp => '\x1D',
         Key::ArrowDown => '\x1E',
