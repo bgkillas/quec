@@ -2,10 +2,12 @@ use console::{Key, Term};
 use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 use std::{
     env::args,
-    fs::File,
-    io::{stdout, BufRead, BufReader, Write},
+    fs::{canonicalize, create_dir, File},
+    io::{stdout, BufRead, BufReader, Read, Write},
     mem,
 };
+//TODO word wrapping and support files longer then screen
+//TODO allow multiple args
 fn main()
 {
     let mut args = args().collect::<Vec<String>>();
@@ -17,13 +19,21 @@ fn main()
     let mut stdout = stdout();
     print!("\x1B[K\x1B[J");
     stdout.flush().unwrap();
-    let mut lines = if File::open(&args[0]).is_err()
+    let mut history_dir = env!("HOME").to_owned() + "/.quec/";
+    let _ = create_dir(history_dir.clone());
+    let (mut lines, mut history) = if File::open(&args[0]).is_err()
     {
-        Vec::new()
+        (
+            Vec::new(),
+            History {
+                pos: 0,
+                list: Vec::new(),
+            },
+        )
     }
     else
     {
-        BufReader::new(File::open(&args[0]).unwrap())
+        let f = BufReader::new(File::open(&args[0]).unwrap())
             .lines()
             .map(|l| {
                 l.unwrap()
@@ -31,9 +41,30 @@ fn main()
                     .filter(|c| c.is_ascii_graphic() || c == &' ' || c == &'\t' || c == &'\n')
                     .collect::<Vec<char>>()
             })
-            .collect::<Vec<Vec<char>>>()
+            .collect::<Vec<Vec<char>>>();
+        history_dir = history_dir
+            + &canonicalize(&args[0])
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .replace('/', "%");
+        (
+            f,
+            if let Ok(mut f) = File::open(history_dir.clone())
+            {
+                let mut read_bytes = Vec::new();
+                f.read_to_end(&mut read_bytes).unwrap();
+                History::from_bytes(&read_bytes)
+            }
+            else
+            {
+                History {
+                    pos: 0,
+                    list: Vec::new(),
+                }
+            },
+        )
     };
-    //TODO word wrapping and support files longer then screen
     let (height, _width) = get_dimensions();
     if lines.is_empty()
     {
@@ -108,6 +139,21 @@ fn main()
                 line += 1;
                 placement = 0;
                 cursor = placement;
+                if history.pos != 0
+                {
+                    history.pos = 0;
+                    history.list.clear();
+                }
+                history.list.insert(
+                    0,
+                    Point {
+                        add: true,
+                        split: true,
+                        pos: (line, placement),
+                        char: '\n',
+                        line: None,
+                    },
+                );
             }
             '\x08' =>
             {
@@ -132,11 +178,40 @@ fn main()
                         lines.len() - line,
                         placement
                     );
+                    if history.pos != 0
+                    {
+                        history.pos = 0;
+                        history.list.clear();
+                    }
+                    history.list.insert(
+                        0,
+                        Point {
+                            add: false,
+                            split: true,
+                            pos: (line, placement),
+                            char: '\0',
+                            line: None,
+                        },
+                    )
                 }
                 else
                 {
                     placement -= 1;
-                    lines[line].remove(placement);
+                    if history.pos != 0
+                    {
+                        history.pos = 0;
+                        history.list.clear();
+                    }
+                    history.list.insert(
+                        0,
+                        Point {
+                            add: false,
+                            split: false,
+                            pos: (line, placement),
+                            char: lines[line].remove(placement),
+                            line: None,
+                        },
+                    );
                     if placement == lines[line].len()
                     {
                         print!("\x08\x1B[K");
@@ -229,7 +304,7 @@ fn main()
                         print!("\x1b[G");
                         placement = 0;
                     }
-                    else if placement != 0
+                    else if cursor != 0
                     {
                         if lines[line].len() > cursor
                         {
@@ -269,6 +344,21 @@ fn main()
                     );
                     placement += 1;
                     cursor = placement;
+                    if history.pos != 0
+                    {
+                        history.pos = 0;
+                        history.list.clear();
+                    }
+                    history.list.insert(
+                        0,
+                        Point {
+                            add: true,
+                            split: false,
+                            pos: (line, placement),
+                            char: c,
+                            line: None,
+                        },
+                    )
                 }
                 else if c == 'w'
                 {
@@ -299,15 +389,32 @@ fn main()
                     }
                     result.push(b'\n');
                     File::create(&args[0]).unwrap().write_all(&result).unwrap();
+                    if !history.list.is_empty()
+                    {
+                        if history_dir.contains('/')
+                        {
+                            history_dir = history_dir
+                                + &canonicalize(&args[0])
+                                    .unwrap()
+                                    .to_str()
+                                    .unwrap()
+                                    .replace('/', "%");
+                        }
+                        File::create(history_dir.clone())
+                            .unwrap()
+                            .write_all(&history.to_bytes())
+                            .unwrap();
+                    }
                 }
                 else if c == 'd'
                 {
+                    //TODO add history support
                     if !lines.is_empty()
                     {
                         if line + 1 == lines.len()
                         {
                             clip = lines.remove(line);
-                            line -= 1;
+                            line = line.saturating_sub(1);
                             placement = 0;
                             cursor = 0;
                             print!("\x1b[K\x1b[A");
@@ -423,6 +530,87 @@ fn main()
                 {
                     edit = true;
                 }
+                else if c == 'z' || c == 'u'
+                {
+                    //TODO consider optimize
+                    //TODO undo
+                    if history.list.len() != history.pos
+                    {
+                        match (
+                            history.list[history.pos].add,
+                            history.list[history.pos].split,
+                            &history.list[history.pos].line,
+                        )
+                        {
+                            (false, false, None) =>
+                            {
+                                line = history.list[history.pos].pos.0;
+                                placement = history.list[history.pos].pos.1;
+                                if line == lines.len()
+                                {
+                                    lines.push(Vec::new());
+                                }
+                                lines[line].insert(placement, history.list[history.pos].char);
+                                placement += 1;
+                            }
+                            (true, false, None) =>
+                            {
+                                line = history.list[history.pos].pos.0;
+                                placement = history.list[history.pos].pos.1 - 1;
+                                lines[line].remove(placement);
+                            }
+                            (false, true, None) =>
+                            {
+                                line = history.list[history.pos].pos.0 + 1;
+                                placement = 0;
+                                let l = lines[line - 1]
+                                    .drain(history.list[history.pos].pos.1..)
+                                    .collect();
+                                lines.insert(line, l);
+                            }
+                            (true, true, None) =>
+                            {
+                                line = history.list[history.pos].pos.0 - 1;
+                                placement = lines[line].len();
+                                let l = lines.remove(line + 1);
+                                lines[line].extend(l);
+                            }
+                            _ => unimplemented!(),
+                        }
+                        cursor = placement;
+                        print!(
+                            "\x1B[H\x1B[J{}\x1B[H{}{}",
+                            lines
+                                .iter()
+                                .map(|vec| vec.iter().collect::<String>())
+                                .collect::<Vec<String>>()
+                                .join("\n")
+                                .replace('\t', " "),
+                            if line == 0
+                            {
+                                "".to_string()
+                            }
+                            else
+                            {
+                                "\x1B[".to_owned() + &line.to_string() + "B"
+                            },
+                            if placement == 0
+                            {
+                                "".to_string()
+                            }
+                            else
+                            {
+                                "\x1B[".to_owned() + &placement.to_string() + "C"
+                            }
+                        );
+                        history.pos += 1;
+                    }
+                }
+                else if c == 'x' || c == 'r'
+                {
+                    //TODO redo
+                    history.pos -= 1;
+                }
             }
         }
         stdout.flush().unwrap();
@@ -451,5 +639,169 @@ fn get_dimensions() -> (usize, usize)
         let mut size: winsize = mem::zeroed();
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &mut size);
         (size.ws_row as usize, size.ws_col as usize)
+    }
+}
+struct History
+{
+    pos: usize,
+    list: Vec<Point>,
+}
+struct Point
+{
+    add: bool,
+    split: bool,
+    pos: (usize, usize),
+    char: char,
+    line: Option<Vec<char>>,
+}
+impl History
+{
+    fn to_bytes(&self) -> Vec<u8>
+    {
+        let mut bytes = Vec::new();
+        bytes.extend(&self.pos.to_le_bytes());
+        bytes.extend(&self.list.len().to_le_bytes());
+        for point in &self.list
+        {
+            let point_bytes = point.to_bytes();
+            bytes.extend(&point_bytes.len().to_le_bytes());
+            bytes.extend(point_bytes);
+        }
+        bytes
+    }
+    fn from_bytes(bytes: &[u8]) -> History
+    {
+        let mut cursor = 0;
+        let pos = usize::from_le_bytes([
+            bytes[cursor],
+            bytes[cursor + 1],
+            bytes[cursor + 2],
+            bytes[cursor + 3],
+            bytes[cursor + 4],
+            bytes[cursor + 5],
+            bytes[cursor + 6],
+            bytes[cursor + 7],
+        ]);
+        cursor += 8;
+        let list_len = usize::from_le_bytes([
+            bytes[cursor],
+            bytes[cursor + 1],
+            bytes[cursor + 2],
+            bytes[cursor + 3],
+            bytes[cursor + 4],
+            bytes[cursor + 5],
+            bytes[cursor + 6],
+            bytes[cursor + 7],
+        ]);
+        cursor += 8;
+        let mut list = Vec::with_capacity(list_len);
+        for _ in 0..list_len
+        {
+            let point_size = usize::from_le_bytes([
+                bytes[cursor],
+                bytes[cursor + 1],
+                bytes[cursor + 2],
+                bytes[cursor + 3],
+                bytes[cursor + 4],
+                bytes[cursor + 5],
+                bytes[cursor + 6],
+                bytes[cursor + 7],
+            ]);
+            cursor += 8;
+            let point_bytes = &bytes[cursor..cursor + point_size];
+            list.push(Point::from_bytes(point_bytes));
+            cursor += point_size;
+        }
+        History { pos, list }
+    }
+}
+impl Point
+{
+    fn to_bytes(&self) -> Vec<u8>
+    {
+        let mut bytes = Vec::new();
+        bytes.extend(&[self.add as u8, self.split as u8]);
+        bytes.extend(&self.pos.0.to_le_bytes());
+        bytes.extend(&self.pos.1.to_le_bytes());
+        bytes.push(self.char as u8);
+        match &self.line
+        {
+            Some(line) =>
+            {
+                bytes.push(1);
+                bytes.extend(&line.len().to_le_bytes());
+                bytes.extend(line.iter().map(|&c| c as u8));
+            }
+            None =>
+            {
+                bytes.push(0);
+            }
+        }
+        bytes
+    }
+    fn from_bytes(bytes: &[u8]) -> Point
+    {
+        let mut cursor = 0;
+        let add = bytes[cursor] != 0;
+        cursor += 1;
+        let split = bytes[cursor] != 0;
+        cursor += 1;
+        let pos_0 = usize::from_le_bytes([
+            bytes[cursor],
+            bytes[cursor + 1],
+            bytes[cursor + 2],
+            bytes[cursor + 3],
+            bytes[cursor + 4],
+            bytes[cursor + 5],
+            bytes[cursor + 6],
+            bytes[cursor + 7],
+        ]);
+        cursor += 8;
+        let pos_1 = usize::from_le_bytes([
+            bytes[cursor],
+            bytes[cursor + 1],
+            bytes[cursor + 2],
+            bytes[cursor + 3],
+            bytes[cursor + 4],
+            bytes[cursor + 5],
+            bytes[cursor + 6],
+            bytes[cursor + 7],
+        ]);
+        cursor += 8;
+        let char = bytes[cursor] as char;
+        cursor += 1;
+        let line = if bytes[cursor] == 1
+        {
+            cursor += 1;
+            let len = usize::from_le_bytes([
+                bytes[cursor],
+                bytes[cursor + 1],
+                bytes[cursor + 2],
+                bytes[cursor + 3],
+                bytes[cursor + 4],
+                bytes[cursor + 5],
+                bytes[cursor + 6],
+                bytes[cursor + 7],
+            ]);
+            cursor += 8;
+            let mut vec = Vec::with_capacity(len);
+            for _ in 0..len
+            {
+                vec.push(bytes[cursor] as char);
+                cursor += 1;
+            }
+            Some(vec)
+        }
+        else
+        {
+            None
+        };
+        Point {
+            add,
+            split,
+            pos: (pos_0, pos_1),
+            char,
+            line,
+        }
     }
 }

@@ -11,6 +11,10 @@
 
 'q' to quit
 
+'z' to undo
+
+'x' to redo
+
 '/' to start search mode
 
 search mode:
