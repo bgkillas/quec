@@ -360,6 +360,11 @@ fn main()
                         {
                             print!("\x1B[A\x1b[{}C", placement);
                         }
+                        if line + 1 == top
+                        {
+                            top -= 1;
+                            clear(&lines, line, placement, top, height);
+                        }
                     }
                     else
                     {
@@ -375,9 +380,17 @@ fn main()
                     {
                         if line + 1 != lines.len()
                         {
-                            println!();
                             placement = 0;
                             line += 1;
+                            if line == height + top
+                            {
+                                top += 1;
+                                clear(&lines, line, placement, top, height);
+                            }
+                            else
+                            {
+                                println!()
+                            }
                         }
                     }
                     else
