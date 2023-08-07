@@ -3,12 +3,13 @@ use console::{Key, Term};
 use history::{History, Point};
 use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 use std::{
+    cmp::Ordering,
     env::args,
     fs::{canonicalize, create_dir, File},
     io::{stdout, BufRead, BufReader, Read, Write},
     mem,
 };
-//TODO word wrapping and support files longer then screen
+//TODO word wrapping
 fn main()
 {
     let mut args = args().collect::<Vec<String>>();
@@ -129,8 +130,7 @@ fn main()
         let mut cursor = 0;
         //let mut start = 0;
         //let mut end = 0;
-        //let mut top = 0;
-        //let mut bot = 0;
+        let mut top = 0;
         let mut time = None;
         loop
         {
@@ -143,67 +143,144 @@ fn main()
             {
                 '\n' =>
                 {
-                    if line + 1 == lines.len() && placement == 0
+                    if edit
                     {
-                        lines.push(Vec::new());
-                        println!();
+                        line += 1;
+                        if line == lines.len() && placement == 0
+                        {
+                            lines.push(Vec::new());
+                            println!();
+                            placement = 0;
+                            cursor = placement;
+                        }
+                        else
+                        {
+                            lines.insert(line, lines[line - 1][placement..].to_vec());
+                            lines.insert(line, lines[line - 1][..placement].to_vec());
+                            lines.remove(line - 1);
+                            placement = 0;
+                            cursor = placement;
+                            clear(&lines, line, placement, top, height);
+                        }
+                        if history.pos != 0
+                        {
+                            history.pos = 0;
+                            history.list.clear();
+                        }
+                        history.list.insert(
+                            0,
+                            Point {
+                                add: true,
+                                split: true,
+                                pos: (line, placement),
+                                char: '\n',
+                                line: None,
+                            },
+                        );
                     }
-                    else
-                    {
-                        lines.insert(line + 1, lines[line][placement..].to_vec());
-                        lines.insert(line + 1, lines[line][..placement].to_vec());
-                        lines.remove(line);
-                        print!(
-                            "\x1b[J\n{}\n\x1B[{}A",
-                            lines[line + 1..]
-                                .iter()
-                                .map(|vec| vec.iter().collect::<String>())
-                                .collect::<Vec<String>>()
-                                .join("\n")
-                                .replace('\t', " "),
-                            lines.len() - line - 1
-                        )
-                    }
-                    line += 1;
-                    if history.pos != 0
-                    {
-                        history.pos = 0;
-                        history.list.clear();
-                    }
-                    history.list.insert(
-                        0,
-                        Point {
-                            add: true,
-                            split: true,
-                            pos: (line, placement),
-                            char: '\n',
-                            line: None,
-                        },
-                    );
-                    placement = 0;
-                    cursor = placement;
                 }
                 '\x08' =>
                 {
-                    if placement == 0
+                    if edit
                     {
-                        if line == 0
+                        if placement == 0
                         {
-                            continue;
+                            if line == 0
+                            {
+                                continue;
+                            }
+                            line -= 1;
+                            placement = lines[line].len();
+                            let t = lines.remove(line + 1);
+                            lines[line].extend(t);
+                            clear(&lines, line, placement, top, height);
+                            if history.pos != 0
+                            {
+                                history.pos = 0;
+                                history.list.clear();
+                            }
+                            history.list.insert(
+                                0,
+                                Point {
+                                    add: false,
+                                    split: true,
+                                    pos: (line, placement),
+                                    char: '\0',
+                                    line: None,
+                                },
+                            )
                         }
-                        line -= 1;
-                        placement = lines[line].len();
-                        let t = lines.remove(line + 1);
-                        lines[line].extend(t);
+                        else
+                        {
+                            placement -= 1;
+                            if history.pos != 0
+                            {
+                                history.pos = 0;
+                                history.list.clear();
+                            }
+                            history.list.insert(
+                                0,
+                                Point {
+                                    add: false,
+                                    split: false,
+                                    pos: (line, placement),
+                                    char: lines[line].remove(placement),
+                                    line: None,
+                                },
+                            );
+                            if placement == lines[line].len()
+                            {
+                                print!("\x08\x1B[K");
+                            }
+                            else
+                            {
+                                print!(
+                                    "\x1B[K\x1B[G{}\x1B[{}D",
+                                    lines[line].iter().collect::<String>().replace('\t', " "),
+                                    lines[line].len() - placement
+                                );
+                            }
+                        }
+                        cursor = placement;
+                    }
+                }
+                '\x01' =>
+                {
+                    //home
+                    placement = 0;
+                    line = 0;
+                    if lines.len() > height
+                    {
+                        top = 0;
+                        clear(&lines, line, placement, top, height);
+                    }
+                    else
+                    {
+                        print!("\x1b[H");
+                    }
+                }
+                '\x02' =>
+                {
+                    //end
+                    line = lines.len() - 1;
+                    placement = lines[line].len();
+                    if lines.len() > height
+                    {
+                        top = lines.len() - height;
+                        clear(&lines, line, placement, top, height);
+                    }
+                    else
+                    {
                         print!(
-                            "\x1B[A\x1B[J{}\n\x1B[{}A{}",
-                            lines[line..]
-                                .iter()
-                                .map(|vec| vec.iter().collect::<String>())
-                                .collect::<Vec<String>>()
-                                .join("\n")
-                                .replace('\t', " "),
-                            lines.len() - line,
+                            "\x1b[H{}{}",
+                            if line == 0
+                            {
+                                String::new()
+                            }
+                            else
+                            {
+                                "\x1B[".to_owned() + &line.to_string() + "B"
+                            },
                             if placement == 0
                             {
                                 String::new()
@@ -213,86 +290,43 @@ fn main()
                                 "\x1B[".to_owned() + &placement.to_string() + "C"
                             }
                         );
-                        if history.pos != 0
-                        {
-                            history.pos = 0;
-                            history.list.clear();
-                        }
-                        history.list.insert(
-                            0,
-                            Point {
-                                add: false,
-                                split: true,
-                                pos: (line, placement),
-                                char: '\0',
-                                line: None,
-                            },
-                        )
+                    }
+                }
+                '\x03' =>
+                {
+                    //page up
+                    if line < height
+                    {
+                        top = 0;
+                        placement = 0;
+                        line = 0;
+                        print!("\x1b[H");
                     }
                     else
                     {
-                        placement -= 1;
-                        if history.pos != 0
-                        {
-                            history.pos = 0;
-                            history.list.clear();
-                        }
-                        history.list.insert(
-                            0,
-                            Point {
-                                add: false,
-                                split: false,
-                                pos: (line, placement),
-                                char: lines[line].remove(placement),
-                                line: None,
-                            },
-                        );
-                        if placement == lines[line].len()
-                        {
-                            print!("\x08\x1B[K");
-                        }
-                        else
-                        {
-                            print!(
-                                "\x1B[K\x1B[G{}\x1B[{}D",
-                                lines[line].iter().collect::<String>().replace('\t', " "),
-                                lines[line].len() - placement
-                            );
-                        }
+                        placement = 0;
+                        line -= height;
+                        top -= height;
+                        clear(&lines, line, placement, top, height);
                     }
-                    cursor = placement;
                 }
-                '\x01' =>
+                '\x04' =>
                 {
-                    //home
-                    placement = 0;
-                    line = 0;
-                    print!("\x1b[H");
-                }
-                '\x02' =>
-                {
-                    //end
-                    line = lines.len() - 1;
-                    placement = lines[line].len();
-                    print!(
-                        "\x1b[H{}{}",
-                        if line == 0
-                        {
-                            String::new()
-                        }
-                        else
-                        {
-                            "\x1B[".to_owned() + &line.to_string() + "B"
-                        },
-                        if placement == 0
-                        {
-                            String::new()
-                        }
-                        else
-                        {
-                            "\x1B[".to_owned() + &placement.to_string() + "C"
-                        }
-                    );
+                    //page down
+                    if line + height >= lines.len()
+                    {
+                        top = lines.len().saturating_sub(height);
+                        line = lines.len() - 1;
+                        placement = lines[line].len();
+                        clear(&lines, line, placement, top, height);
+                    }
+                    else
+                    {
+                        placement = 0;
+                        line += height;
+                        top += height;
+                        clear(&lines, line, placement, top, height);
+                    }
                 }
                 '\x1B' =>
                 {
@@ -305,7 +339,14 @@ fn main()
                         }
                         line -= 1;
                         placement = lines[line].len();
-                        print!("\x1B[A\x1b[{}C", placement);
+                        if placement == 0
+                        {
+                            print!("\x1B[A");
+                        }
+                        else
+                        {
+                            print!("\x1B[A\x1b[{}C", placement);
+                        }
                     }
                     else
                     {
@@ -354,6 +395,11 @@ fn main()
                             }
                         }
                     }
+                    if line + 1 == top
+                    {
+                        top -= 1;
+                        clear(&lines, line, placement, top, height);
+                    }
                 }
                 '\x1E' =>
                 {
@@ -384,6 +430,11 @@ fn main()
                                 placement = lines[line].len();
                             }
                         }
+                    }
+                    if line == height + top
+                    {
+                        top += 1;
+                        clear(&lines, line, placement, top, height);
                     }
                 }
                 '\x1A' => edit = false,
@@ -498,16 +549,7 @@ fn main()
                                 clip = lines.remove(line);
                                 placement = 0;
                                 cursor = 0;
-                                print!(
-                                    "\x1b[G\x1b[J{}\n\x1B[{}A",
-                                    lines[line..]
-                                        .iter()
-                                        .map(|vec| vec.iter().collect::<String>())
-                                        .collect::<Vec<String>>()
-                                        .join("\n")
-                                        .replace('\t', " "),
-                                    lines.len() - line
-                                )
+                                clear(&lines, line, placement, top, height);
                             }
                             if lines.is_empty()
                             {
@@ -535,16 +577,7 @@ fn main()
                         lines.insert(line, clip.clone());
                         placement = 0;
                         cursor = 0;
-                        print!(
-                            "\x1b[G\x1b[J{}\n\x1B[{}A",
-                            lines[line..]
-                                .iter()
-                                .map(|vec| vec.iter().collect::<String>())
-                                .collect::<Vec<String>>()
-                                .join("\n")
-                                .replace('\t', " "),
-                            lines.len() - line
-                        );
+                        clear(&lines, line, placement, top, height);
                         if history.pos != 0
                         {
                             history.pos = 0;
@@ -588,29 +621,27 @@ fn main()
                                                 if i[j..j + word.len()] == word
                                                 {
                                                     ln = (l, j);
-                                                    print!(
-                                                        "\x1B[H{}{}",
-                                                        if ln.0 == 0
+                                                    top = match top.cmp(&line)
+                                                    {
+                                                        Ordering::Greater => line,
+                                                        Ordering::Less =>
                                                         {
-                                                            String::new()
+                                                            if height > line
+                                                            {
+                                                                0
+                                                            }
+                                                            else if top + height > line
+                                                            {
+                                                                top
+                                                            }
+                                                            else
+                                                            {
+                                                                line - height + 1
+                                                            }
                                                         }
-                                                        else
-                                                        {
-                                                            "\x1B[".to_owned()
-                                                                + ln.0.to_string().as_str()
-                                                                + "B"
-                                                        },
-                                                        if ln.1 == 0
-                                                        {
-                                                            String::new()
-                                                        }
-                                                        else
-                                                        {
-                                                            "\x1B[".to_owned()
-                                                                + ln.1.to_string().as_str()
-                                                                + "C"
-                                                        },
-                                                    );
+                                                        Ordering::Equal => top,
+                                                    };
+                                                    clear(&lines, line, placement, top, height);
                                                     stdout.flush().unwrap();
                                                     (line, placement) = ln;
                                                     cursor = placement;
@@ -701,34 +732,30 @@ fn main()
                             _ => unimplemented!(),
                         }
                         cursor = placement;
-                        print!(
-                            "\x1B[H\x1B[J{}\x1B[H{}{}",
-                            lines
-                                .iter()
-                                .map(|vec| vec.iter().collect::<String>())
-                                .collect::<Vec<String>>()
-                                .join("\n")
-                                .replace('\t', " "),
-                            if line == 0
+                        top = match top.cmp(&line)
+                        {
+                            Ordering::Greater => line,
+                            Ordering::Less =>
                             {
-                                String::new()
+                                if height > line
+                                {
+                                    0
+                                }
+                                else if top + height > line
+                                {
+                                    top
+                                }
+                                else
+                                {
+                                    line - height + 1
+                                }
                             }
-                            else
-                            {
-                                "\x1B[".to_owned() + &line.to_string() + "B"
-                            },
-                            if placement == 0
-                            {
-                                String::new()
-                            }
-                            else
-                            {
-                                "\x1B[".to_owned() + &placement.to_string() + "C"
-                            }
-                        );
+                            Ordering::Equal => top,
+                        };
+                        clear(&lines, line, placement, top, height);
                         history.pos += 1;
                     }
-                    else if (c == 'x' || c == 'r') && history.pos > 0
+                    else if (c == 'x' || c == 'y') && history.pos > 0
                     {
                         history.pos -= 1;
                         match (
@@ -789,31 +816,27 @@ fn main()
                             _ => unimplemented!(),
                         }
                         cursor = placement;
-                        print!(
-                            "\x1B[H\x1B[J{}\x1B[H{}{}",
-                            lines
-                                .iter()
-                                .map(|vec| vec.iter().collect::<String>())
-                                .collect::<Vec<String>>()
-                                .join("\n")
-                                .replace('\t', " "),
-                            if line == 0
+                        top = match top.cmp(&line)
+                        {
+                            Ordering::Greater => line,
+                            Ordering::Less =>
                             {
-                                String::new()
+                                if height > line
+                                {
+                                    0
+                                }
+                                else if top + height > line
+                                {
+                                    top
+                                }
+                                else
+                                {
+                                    line - height + 1
+                                }
                             }
-                            else
-                            {
-                                "\x1B[".to_owned() + &line.to_string() + "B"
-                            },
-                            if placement == 0
-                            {
-                                String::new()
-                            }
-                            else
-                            {
-                                "\x1B[".to_owned() + &placement.to_string() + "C"
-                            }
-                        );
+                            Ordering::Equal => top,
+                        };
+                        clear(&lines, line, placement, top, height);
                     }
                 }
             }
@@ -889,5 +912,40 @@ fn help()
 search mode:\n\
 'esc' to quit search mode\n\
 'enter' to search through file"
+    );
+}
+fn clear(lines: &[Vec<char>], line: usize, placement: usize, top: usize, height: usize)
+{
+    print!(
+        "\x1B[H\x1B[J{}\x1B[H{}{}",
+        lines[top..if lines.len() < height + top
+        {
+            lines.len()
+        }
+        else
+        {
+            height + top
+        }]
+            .iter()
+            .map(|vec| vec.iter().collect::<String>())
+            .collect::<Vec<String>>()
+            .join("\n")
+            .replace('\t', " "),
+        if line - top == 0
+        {
+            String::new()
+        }
+        else
+        {
+            "\x1B[".to_owned() + &(line - top).to_string() + "B"
+        },
+        if placement == 0
+        {
+            String::new()
+        }
+        else
+        {
+            "\x1B[".to_owned() + &placement.to_string() + "C"
+        }
     );
 }
