@@ -9,6 +9,12 @@ readme       = "README.md"
 keywords     = ["cli","editor","text-editor"]
 categories   = ["text-editors"]
 repository   = "https://github.com/bgkillas/quec"
+
+[profile.release]
+codegen-units = 1
+lto = true
+strip = true
+
 [dependencies]
 console      = "0.15.7"
 libc         = "0.2.147"

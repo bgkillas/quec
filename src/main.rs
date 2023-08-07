@@ -134,6 +134,14 @@ fn main()
         let mut time = None;
         loop
         {
+            if history.list.len() >= 1000
+            {
+                history.list.drain(1000..);
+            }
+            if history.pos > history.list.len()
+            {
+                history.list.clear();
+            }
             c = read_single_char();
             if debug
             {
@@ -177,6 +185,11 @@ fn main()
                                 line: None,
                             },
                         );
+                        if line == height + top
+                        {
+                            top += 1;
+                            clear(&lines, line, placement, top, height);
+                        }
                     }
                 }
                 '\x08' =>
@@ -440,7 +453,7 @@ fn main()
                 '\x1A' => edit = false,
                 _ =>
                 {
-                    if edit
+                    if edit && (c.is_ascii_graphic() || c == ' ' || c == '\t' || c == '\n')
                     {
                         lines[line].insert(placement, c);
                         print!(
@@ -507,13 +520,22 @@ fn main()
                         }
                         result.push(b'\n');
                         File::create(i.clone()).unwrap().write_all(&result).unwrap();
-                        if history.list.len() >= 1000
+                        loop
                         {
-                            history.list.drain(1000..);
-                        }
-                        if history.pos > history.list.len()
-                        {
-                            history.list.clear();
+                            if !history.list.is_empty()
+                                && (
+                                    history.list[0].add,
+                                    history.list[0].split,
+                                    history.list[0].line.clone(),
+                                ) == (true, true, None)
+                                && history.list[0].pos.0 >= lines.len()
+                            {
+                                history.list.remove(0);
+                            }
+                            else
+                            {
+                                break;
+                            }
                         }
                         if !history.list.is_empty()
                         {
@@ -641,9 +663,9 @@ fn main()
                                                         }
                                                         Ordering::Equal => top,
                                                     };
+                                                    (line, placement) = ln;
                                                     clear(&lines, line, placement, top, height);
                                                     stdout.flush().unwrap();
-                                                    (line, placement) = ln;
                                                     cursor = placement;
                                                     break 'inner;
                                                 }
@@ -774,10 +796,6 @@ fn main()
                             {
                                 line = history.list[history.pos].pos.0;
                                 placement = history.list[history.pos].pos.1 - 1;
-                                if line == lines.len()
-                                {
-                                    lines.push(Vec::new());
-                                }
                                 lines[line].insert(placement, history.list[history.pos].char);
                                 placement += 1;
                             }
@@ -790,8 +808,12 @@ fn main()
                             }
                             (true, true, None) =>
                             {
-                                line = history.list[history.pos].pos.0 + 1;
+                                line = history.list[history.pos].pos.0;
                                 placement = 0;
+                                if line == lines.len()
+                                {
+                                    lines.push(Vec::new())
+                                }
                                 let l = lines[line]
                                     .drain(history.list[history.pos].pos.1..)
                                     .collect();
