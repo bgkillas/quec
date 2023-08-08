@@ -70,7 +70,13 @@ fn main()
                 .map(|l| {
                     l.unwrap()
                         .chars()
-                        .filter(|c| c.is_ascii_graphic() || c == &' ' || c == &'\t' || c == &'\n')
+                        .filter(|c| {
+                            !c.is_ascii()
+                                || c.is_ascii_graphic()
+                                || c == &' '
+                                || c == &'\t'
+                                || c == &'\n'
+                        })
                         .collect::<Vec<char>>()
                 })
                 .collect::<Vec<Vec<char>>>();
@@ -548,7 +554,11 @@ fn main()
                     search = false;
                     clear(&lines, top, height, start, width);
                 }
-                _ if c.is_ascii_graphic() || c == ' ' || c == '\t' || c == '\n' =>
+                _ if !c.is_ascii()
+                    || c.is_ascii_graphic()
+                    || c == ' '
+                    || c == '\t'
+                    || c == '\n' =>
                 {
                     if edit
                     {
