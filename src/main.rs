@@ -603,6 +603,7 @@ fn main()
                 {
                     //start of line
                     placement = 0;
+                    cursor = placement;
                     if start != 0
                     {
                         start = 0;
@@ -613,12 +614,15 @@ fn main()
                 {
                     //end of line
                     placement = lines[line].len();
-                    if placement - width > start
+                    cursor = placement;
+                    if placement > start + width
                     {
                         start = placement - width + 1;
                         clear(&lines, top, height, start, width);
                     }
                 }
+                '\0' =>
+                {}
                 _ if !c.is_ascii()
                     || c.is_ascii_graphic()
                     || c == ' '
@@ -772,21 +776,18 @@ fn main()
                     else if c == 'd'
                     {
                         //cut line
+                        placement = 0;
+                        cursor = 0;
+                        start = 0;
                         if line + 1 == lines.len()
                         {
                             clip = lines.pop().unwrap();
                             lines.push(Vec::new());
-                            placement = 0;
-                            cursor = 0;
-                            start = 0;
                             print!("\x1b[G\x1b[K");
                         }
                         else
                         {
                             clip = lines.remove(line);
-                            placement = 0;
-                            cursor = 0;
-                            start = 0;
                             clear(&lines, top, height, start, width);
                         }
                         if history.pos != 0
