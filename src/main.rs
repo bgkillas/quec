@@ -24,12 +24,12 @@ fn main()
         }
         match args[0].as_str()
         {
-            "--help" =>
+            "--help" | "-h" =>
             {
                 help();
                 return;
             }
-            "--version" =>
+            "--version" | "-v" =>
             {
                 println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
                 return;
@@ -155,6 +155,7 @@ fn main()
             {
                 '\n' if !search =>
                 {
+                    //enter
                     if edit
                     {
                         line += 1;
@@ -203,6 +204,7 @@ fn main()
                 }
                 '\x08' =>
                 {
+                    //backspace
                     if edit
                     {
                         if placement == 0
@@ -564,12 +566,14 @@ fn main()
                 }
                 '\x1A' =>
                 {
+                    //esc
                     edit = false;
                     search = false;
                     clear(&lines, top, height, start, width);
                 }
                 '`' if !edit && n + 1 != files.len() =>
                 {
+                    //next file
                     files[n] = (lines, history, save_file, history_file);
                     n += 1;
                     print!("\x1B[H\x1B[J");
@@ -578,6 +582,7 @@ fn main()
                 }
                 '~' if !edit && n != 0 =>
                 {
+                    //last file
                     files[n] = (lines, history, save_file, history_file);
                     n -= 1;
                     print!("\x1B[H\x1B[J");
@@ -586,6 +591,7 @@ fn main()
                 }
                 '0' if !edit =>
                 {
+                    //start of line
                     placement = 0;
                     if start != 0
                     {
@@ -595,6 +601,7 @@ fn main()
                 }
                 '$' if !edit =>
                 {
+                    //end of line
                     placement = lines[line].len();
                     if placement - width > start
                     {
@@ -681,6 +688,7 @@ fn main()
                     }
                     else if c == 'w'
                     {
+                        //save
                         result = lines
                             .iter()
                             .map(|line| {
@@ -748,10 +756,12 @@ fn main()
                     }
                     else if c == 'y'
                     {
+                        //copy line
                         clip = lines[line].clone();
                     }
                     else if c == 'd'
                     {
+                        //cut line
                         if line + 1 == lines.len()
                         {
                             clip = lines.pop().unwrap();
@@ -787,6 +797,7 @@ fn main()
                     }
                     else if c == 'p'
                     {
+                        //paste line
                         lines.insert(line, clip.clone());
                         placement = 0;
                         cursor = 0;
@@ -810,22 +821,26 @@ fn main()
                     }
                     else if c == '/'
                     {
+                        //enable search
                         search = true;
                         ln = None;
                         word = Vec::new();
                     }
                     else if c == 'q'
                     {
+                        //quit
                         print!("\x1B[G\x1B[{}B\x1B[?1049l", height);
                         stdout.flush().unwrap();
                         return;
                     }
                     else if c == 'i'
                     {
+                        //enable edit mode
                         edit = true;
                     }
-                    else if (c == 'z' || c == 'u') && history.list.len() != history.pos
+                    else if c == 'u' && history.list.len() != history.pos
                     {
+                        //undo
                         match (
                             history.list[history.pos].add,
                             history.list[history.pos].split,
@@ -889,8 +904,9 @@ fn main()
                         clear(&lines, top, height, start, width);
                         history.pos += 1;
                     }
-                    else if c == 'x' && history.pos > 0
+                    else if c == 'U' && history.pos > 0
                     {
+                        //redo
                         history.pos -= 1;
                         match (
                             history.list[history.pos].add,

@@ -53,7 +53,7 @@ requires modern terminal on windows, like windows terminal
 
 ``u`` to undo
 
-``x`` to redo
+``U`` to redo
 
 ``/`` to start search mode
 

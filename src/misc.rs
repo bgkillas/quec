@@ -30,7 +30,7 @@ pub fn help()
 '~' to go to last file\n\
 'q' to quit\n\
 'u' to undo\n\
-'x' to redo\n\
+'U' to redo\n\
 '/' to start search mode\n\
 search mode:\n\
 'esc' to quit search mode\n\
