@@ -556,6 +556,11 @@ fn main()
                         clear_line(&lines, line, placement, width, start);
                         placement += 1;
                         cursor = placement;
+                        if placement == width + start
+                        {
+                            start += 1;
+                            clear(&lines, top, height, start, width);
+                        }
                         if history.pos != 0
                         {
                             history.list.drain(..history.pos);
@@ -690,6 +695,7 @@ fn main()
                             lines.push(Vec::new());
                             placement = 0;
                             cursor = 0;
+                            start = 0;
                             print!("\x1b[G\x1b[K");
                         }
                         else
@@ -697,6 +703,7 @@ fn main()
                             clip = lines.remove(line);
                             placement = 0;
                             cursor = 0;
+                            start = 0;
                             clear(&lines, top, height, start, width);
                         }
                         if history.pos != 0
@@ -720,6 +727,7 @@ fn main()
                         lines.insert(line, clip.clone());
                         placement = 0;
                         cursor = 0;
+                        start = 0;
                         clear(&lines, top, height, start, width);
                         if history.pos != 0
                         {
