@@ -664,13 +664,13 @@ fn main()
                                         if (ln.is_some_and(|x| l >= x.0) || ln.is_none())
                                             && word.len() <= i.len()
                                         {
-                                            for j in
-                                                if ln.is_none() { 0 } else { ln.unwrap().1 + 1 }
-                                                    ..=(i.len() - word.len())
+                                            for j in if let Some(n) = ln { n.1 + 1 } else { 0 }
+                                                ..=(i.len() - word.len())
                                             {
                                                 if i[j..j + word.len()] == word
                                                 {
                                                     ln = Some((l, j));
+                                                    (line, placement) = ln.unwrap();
                                                     top = match top.cmp(&line)
                                                     {
                                                         Ordering::Greater => line,
@@ -691,7 +691,6 @@ fn main()
                                                         }
                                                         Ordering::Equal => top,
                                                     };
-                                                    (line, placement) = ln.unwrap();
                                                     cursor = placement;
                                                     clear(&lines, line, placement, top, height);
                                                     stdout.flush().unwrap();
