@@ -7,13 +7,13 @@ use std::{
     fs::{canonicalize, create_dir, File},
     io::{stdout, BufRead, BufReader, Read, Write},
 };
-#[cfg(not(unix))]
-use term_size::dimensions;
 #[cfg(unix)]
 use {
     libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ},
     std::mem,
 };
+#[cfg(not(unix))]
+use {std::env::var, term_size::dimensions};
 //TODO package for windows
 //TODO word wrapping
 fn main()
@@ -51,11 +51,11 @@ fn main()
     let history_dir = env!("HOME").to_owned() + "/.quec/";
     #[cfg(not(unix))]
     let history_dir = &format!(
-        "C:\\Users\\{}\\AppData\\Roaming\\quec",
+        "C:\\Users\\{}\\AppData\\Roaming\\quec\\",
         var("USERNAME").unwrap()
     );
     let _ = create_dir(history_dir.clone());
-    let (height, width) = get_dimensions();
+    let (mut height, mut width) = get_dimensions();
     'outer: for (n, i) in args.iter().enumerate()
     {
         let mut history_file = String::new();
@@ -91,12 +91,13 @@ fn main()
             }
             #[cfg(not(unix))]
             {
-                history_file = history_dir.clone()
-                    + &canonicalize(i.clone())
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .replace('\\', "%");
+                history_file = canonicalize(i.clone())
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .replace('\\', "%");
+                history_file =
+                    history_dir.clone() + &history_file[history_file.find(':').unwrap()..];
             }
             (
                 f,
@@ -150,6 +151,9 @@ fn main()
         let mut placement: usize = 0;
         let mut line: usize = 0;
         let mut edit = false;
+        let mut search = false;
+        let mut ln: Option<(usize, usize)> = None;
+        let mut word: Vec<char> = Vec::new();
         let mut clip = Vec::new();
         let mut result: Vec<u8>;
         let mut cursor = 0;
@@ -157,6 +161,31 @@ fn main()
         let mut time = None;
         loop
         {
+            if (height, width) != get_dimensions()
+            {
+                (height, width) = get_dimensions();
+                top = match top.cmp(&line)
+                {
+                    Ordering::Greater => line,
+                    Ordering::Less =>
+                    {
+                        if height > line
+                        {
+                            0
+                        }
+                        else if top + height > line
+                        {
+                            top
+                        }
+                        else
+                        {
+                            line - height + 1
+                        }
+                    }
+                    Ordering::Equal => top,
+                };
+                clear(&lines, top, height);
+            }
             if history.list.len() >= 1000
             {
                 history.list.drain(1000..);
@@ -172,7 +201,7 @@ fn main()
             }
             match c
             {
-                '\n' =>
+                '\n' if !search =>
                 {
                     if edit
                     {
@@ -277,6 +306,16 @@ fn main()
                         }
                         cursor = placement;
                     }
+                    else if search && !word.is_empty()
+                    {
+                        word.pop();
+                        print!(
+                            "\x1B[G\x1B[{}B\x1B[{}C\x1B[K{}",
+                            height,
+                            width - 30,
+                            word.iter().collect::<String>()
+                        );
+                    }
                 }
                 '\x01' =>
                 {
@@ -288,6 +327,10 @@ fn main()
                         top = 0;
                         clear(&lines, top, height);
                     }
+                    if search
+                    {
+                        ln = Some((line, placement));
+                    }
                 }
                 '\x02' =>
                 {
@@ -298,6 +341,10 @@ fn main()
                     {
                         top = lines.len() - height;
                         clear(&lines, top, height);
+                    }
+                    if search
+                    {
+                        ln = Some((line, placement));
                     }
                 }
                 '\x03' =>
@@ -316,6 +363,10 @@ fn main()
                         top -= height;
                         clear(&lines, top, height);
                     }
+                    if search
+                    {
+                        ln = Some((line, placement));
+                    }
                 }
                 '\x04' =>
                 {
@@ -333,6 +384,10 @@ fn main()
                         line += height;
                         top += height;
                         clear(&lines, top, height);
+                    }
+                    if search
+                    {
+                        ln = Some((line, placement));
                     }
                 }
                 '\x1B' =>
@@ -357,6 +412,10 @@ fn main()
                         placement -= 1;
                     }
                     cursor = placement;
+                    if search
+                    {
+                        ln = Some((line, placement));
+                    }
                 }
                 '\x1C' =>
                 {
@@ -383,6 +442,10 @@ fn main()
                         placement += 1;
                     }
                     cursor = placement;
+                    if search
+                    {
+                        ln = Some((line, placement));
+                    }
                 }
                 '\x1D' =>
                 {
@@ -413,6 +476,10 @@ fn main()
                     {
                         top -= 1;
                         clear(&lines, top, height);
+                    }
+                    if search
+                    {
+                        ln = Some((line, placement));
                     }
                 }
                 '\x1E' =>
@@ -446,11 +513,20 @@ fn main()
                         top += 1;
                         clear(&lines, top, height);
                     }
+                    if search
+                    {
+                        ln = Some((line, placement));
+                    }
                 }
-                '\x1A' => edit = false,
-                _ =>
+                '\x1A' =>
                 {
-                    if edit && (c.is_ascii_graphic() || c == ' ' || c == '\t' || c == '\n')
+                    edit = false;
+                    search = false;
+                    clear(&lines, top, height);
+                }
+                _ if c.is_ascii_graphic() || c == ' ' || c == '\t' || c == '\n' =>
+                {
+                    if edit
                     {
                         lines[line].insert(placement, c);
                         print!(
@@ -477,6 +553,66 @@ fn main()
                                 line: None,
                             },
                         )
+                    }
+                    else if search
+                    {
+                        if c != '\n'
+                        {
+                            ln = None;
+                            word.push(c);
+                            print!(
+                                "\x1B[G\x1B[{}B\x1B[{}C\x1B[K{}",
+                                height,
+                                width - 30,
+                                word.iter().collect::<String>()
+                            );
+                        }
+                        'inner: for (l, i) in lines.iter().enumerate()
+                        {
+                            if (ln.is_some_and(|x| l >= x.0) || ln.is_none())
+                                && word.len() <= i.len()
+                            {
+                                for j in if let Some(n) = ln { n.1 + 1 } else { 0 }
+                                    ..=(i.len() - word.len())
+                                {
+                                    if i[j..j + word.len()] == word
+                                    {
+                                        ln = Some((l, j));
+                                        (line, placement) = ln.unwrap();
+                                        top = match top.cmp(&line)
+                                        {
+                                            Ordering::Greater => line,
+                                            Ordering::Less =>
+                                            {
+                                                if height > line
+                                                {
+                                                    0
+                                                }
+                                                else if top + height > line
+                                                {
+                                                    top
+                                                }
+                                                else
+                                                {
+                                                    line - height + 1
+                                                }
+                                            }
+                                            Ordering::Equal => top,
+                                        };
+                                        cursor = placement;
+                                        clear(&lines, top, height);
+                                        print!(
+                                            "\x1B[G\x1B[{}B\x1B[{}C\x1B[K{}",
+                                            height,
+                                            width - 30,
+                                            word.iter().collect::<String>()
+                                        );
+                                        break 'inner;
+                                    }
+                                }
+                                ln = None;
+                            }
+                        }
                     }
                     else if c == 'w'
                     {
@@ -539,18 +675,27 @@ fn main()
                                 }
                                 #[cfg(not(unix))]
                                 {
+                                    history_file = canonicalize(i.clone())
+                                        .unwrap()
+                                        .to_str()
+                                        .unwrap()
+                                        .replace('\\', "%");
                                     history_file = history_dir.clone()
-                                        + &canonicalize(i.clone())
-                                            .unwrap()
-                                            .to_str()
-                                            .unwrap()
-                                            .replace('\\', "%");
+                                        + &history_file[history_file.find(':').unwrap()..];
                                 }
                             }
+                            println!("{}", history_file);
                             File::create(history_file.clone())
                                 .unwrap()
                                 .write_all(&history.to_bytes())
                                 .unwrap();
+                        }
+                    }
+                    else if c == 'y'
+                    {
+                        if !lines.is_empty()
+                        {
+                            clip = lines[line].clone();
                         }
                     }
                     else if c == 'd'
@@ -571,10 +716,6 @@ fn main()
                                 placement = 0;
                                 cursor = 0;
                                 clear(&lines, top, height);
-                            }
-                            if lines.is_empty()
-                            {
-                                lines.push(Vec::new());
                             }
                             if history.pos != 0
                             {
@@ -617,69 +758,9 @@ fn main()
                     }
                     else if c == '/'
                     {
-                        let mut ln: Option<(usize, usize)> = None;
-                        let mut word = Vec::new();
-                        loop
-                        {
-                            c = read_single_char(&term);
-                            match c
-                            {
-                                '\x1A' => break,
-                                '\x08' if !word.is_empty() =>
-                                {
-                                    word.pop();
-                                }
-                                _ =>
-                                {
-                                    if c != '\n'
-                                    {
-                                        ln = None;
-                                        word.push(c);
-                                    }
-                                    'inner: for (l, i) in lines.iter().enumerate()
-                                    {
-                                        if (ln.is_some_and(|x| l >= x.0) || ln.is_none())
-                                            && word.len() <= i.len()
-                                        {
-                                            for j in if let Some(n) = ln { n.1 + 1 } else { 0 }
-                                                ..=(i.len() - word.len())
-                                            {
-                                                if i[j..j + word.len()] == word
-                                                {
-                                                    ln = Some((l, j));
-                                                    (line, placement) = ln.unwrap();
-                                                    top = match top.cmp(&line)
-                                                    {
-                                                        Ordering::Greater => line,
-                                                        Ordering::Less =>
-                                                        {
-                                                            if height > line
-                                                            {
-                                                                0
-                                                            }
-                                                            else if top + height > line
-                                                            {
-                                                                top
-                                                            }
-                                                            else
-                                                            {
-                                                                line - height + 1
-                                                            }
-                                                        }
-                                                        Ordering::Equal => top,
-                                                    };
-                                                    cursor = placement;
-                                                    clear(&lines, top, height);
-                                                    stdout.flush().unwrap();
-                                                    break 'inner;
-                                                }
-                                            }
-                                            ln = None;
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        search = true;
+                        ln = None;
+                        word = Vec::new();
                     }
                     else if c == 'q'
                     {
@@ -781,7 +862,7 @@ fn main()
                         clear(&lines, top, height);
                         history.pos += 1;
                     }
-                    else if (c == 'x' || c == 'y') && history.pos > 0
+                    else if c == 'x' && history.pos > 0
                     {
                         history.pos -= 1;
                         match (
@@ -865,6 +946,8 @@ fn main()
                         clear(&lines, top, height);
                     }
                 }
+                _ =>
+                {}
             }
             if debug
             {
@@ -948,12 +1031,13 @@ fn help()
     println!(
         "'i' to enter edit mode\n\
 'esc' to exit edit mode\n\
+'y' to copy line\n\
 'd' to cut line\n\
 'p' to print line\n\
 'w' to save\n\
 'q' to quit\n\
 'u'/'z' to undo\n\
-'y'/'x' to redo\n\
+'x' to redo\n\
 '/' to start search mode\n\
 search mode:\n\
 'esc' to quit search mode\n\

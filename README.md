@@ -17,6 +17,8 @@ requires modern terminal on windows, like windows terminal
 
 ``esc`` to exit edit mode
 
+``y`` to copy line
+
 ``d`` to cut line
 
 ``p`` to print line
@@ -27,7 +29,7 @@ requires modern terminal on windows, like windows terminal
 
 ``u``/``z`` to undo
 
-``y``/``x`` to redo
+``x`` to redo
 
 ``/`` to start search mode
 
