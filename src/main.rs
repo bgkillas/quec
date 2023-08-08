@@ -55,10 +55,11 @@ fn main()
     );
     let _ = create_dir(history_dir.clone());
     let (mut height, mut width) = get_dimensions();
-    'outer: for (n, i) in args.iter().enumerate()
+    let mut files: Vec<(Vec<Vec<char>>, History, String, String)> = Vec::new();
+    for arg in args
     {
         let mut history_file = String::new();
-        let (mut lines, mut history) = if File::open(i.clone()).is_err()
+        let (mut lines, history) = if File::open(arg.clone()).is_err()
         {
             (
                 Vec::new(),
@@ -70,7 +71,7 @@ fn main()
         }
         else
         {
-            let f = BufReader::new(File::open(i.clone()).unwrap())
+            let f = BufReader::new(File::open(&arg).unwrap())
                 .lines()
                 .map(|l| {
                     l.unwrap()
@@ -85,7 +86,7 @@ fn main()
                         .collect::<Vec<char>>()
                 })
                 .collect::<Vec<Vec<char>>>();
-            history_file = get_file(i.clone(), history_dir.clone());
+            history_file = get_file(arg.clone(), history_dir.clone());
             (
                 f,
                 if let Ok(mut f) = File::open(history_file.clone())
@@ -103,17 +104,19 @@ fn main()
                 },
             )
         };
-        let mut top = 0;
-        let mut start = 0;
         if lines.is_empty()
         {
             lines.push(Vec::new());
-            print!("{}\x1B[H", "\n".repeat(height));
         }
-        else
-        {
-            clear(&lines, top, height, start, width);
-        }
+        files.push((lines, history, arg, history_file));
+    }
+    let mut n = 0;
+    'outer: loop
+    {
+        let (mut lines, mut history, save_file, mut history_file) = files[n].clone();
+        let mut top = 0;
+        let mut start = 0;
+        clear(&lines, top, height, start, width);
         print!("\x1B[G\x1B[{}B\x1B[{}C\x1B[K1,1\x1B[H", height, width - 15,);
         stdout.flush().unwrap();
         let mut c;
@@ -565,6 +568,22 @@ fn main()
                     search = false;
                     clear(&lines, top, height, start, width);
                 }
+                '`' if !edit && n + 1 != files.len() =>
+                {
+                    files[n] = (lines, history, save_file, history_file);
+                    n += 1;
+                    print!("\x1B[H\x1B[J");
+                    stdout.flush().unwrap();
+                    continue 'outer;
+                }
+                '~' if !edit && n != 0 =>
+                {
+                    files[n] = (lines, history, save_file, history_file);
+                    n -= 1;
+                    print!("\x1B[H\x1B[J");
+                    stdout.flush().unwrap();
+                    continue 'outer;
+                }
                 '0' if !edit =>
                 {
                     placement = 0;
@@ -668,11 +687,13 @@ fn main()
                                 line.iter()
                                     .collect::<String>()
                                     .trim_end()
-                                    .chars()
-                                    .map(|c| c as u8)
-                                    .collect::<Vec<u8>>()
+                                    .as_bytes()
+                                    .to_vec()
                             })
-                            .flat_map(|line| line.into_iter().chain(std::iter::once(b'\n')))
+                            .flat_map(|mut line| {
+                                line.push(b'\n');
+                                line.into_iter()
+                            })
                             .collect();
                         result.pop();
                         while let Some(last) = result.last()
@@ -688,7 +709,10 @@ fn main()
                             }
                         }
                         result.push(b'\n');
-                        File::create(i.clone()).unwrap().write_all(&result).unwrap();
+                        File::create(save_file.clone())
+                            .unwrap()
+                            .write_all(&result)
+                            .unwrap();
                         loop
                         {
                             if !history.list.is_empty()
@@ -710,7 +734,7 @@ fn main()
                         {
                             if history_file.is_empty()
                             {
-                                history_file = get_file(i.clone(), history_dir.clone());
+                                history_file = get_file(save_file.clone(), history_dir.clone());
                             }
                             File::create(history_file.clone())
                                 .unwrap()
@@ -719,7 +743,7 @@ fn main()
                         }
                         else
                         {
-                            std::fs::remove_file(history_file.clone()).unwrap();
+                            let _ = std::fs::remove_file(history_file.clone());
                         }
                     }
                     else if c == 'y'
@@ -792,16 +816,9 @@ fn main()
                     }
                     else if c == 'q'
                     {
-                        if args.len() == n + 1
-                        {
-                            print!("\x1B[G\x1B[{}B\x1B[?1049l", height);
-                        }
-                        else
-                        {
-                            print!("\x1B[H\x1B[J");
-                        }
+                        print!("\x1B[G\x1B[{}B\x1B[?1049l", height);
                         stdout.flush().unwrap();
-                        continue 'outer;
+                        return;
                     }
                     else if c == 'i'
                     {

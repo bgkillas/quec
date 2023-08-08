@@ -45,9 +45,13 @@ requires modern terminal on windows, like windows terminal
 
 ``w`` to save
 
+`` ` `` to go to next file
+
+``~`` to go to last file
+
 ``q`` to quit
 
-``u``/``z`` to undo
+``u`` to undo
 
 ``x`` to redo
 

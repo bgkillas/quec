@@ -26,8 +26,10 @@ pub fn help()
 'd' to cut line\n\
 'p' to print line\n\
 'w' to save\n\
+'`' to go to next file\n\
+'~' to go to last file\n\
 'q' to quit\n\
-'u'/'z' to undo\n\
+'u' to undo\n\
 'x' to redo\n\
 '/' to start search mode\n\
 search mode:\n\

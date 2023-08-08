@@ -1,8 +1,10 @@
+#[derive(Clone)]
 pub struct History
 {
     pub pos: usize,
     pub list: Vec<Point>,
 }
+#[derive(Clone)]
 pub struct Point
 {
     pub add: bool,
@@ -54,14 +56,17 @@ impl Point
         bytes.extend(&[self.add as u8, self.split as u8]);
         bytes.extend(&self.pos.0.to_le_bytes());
         bytes.extend(&self.pos.1.to_le_bytes());
-        bytes.push(self.char as u8);
+        let bind = self.char.to_string();
+        let char_bytes = bind.as_bytes();
+        bytes.push(char_bytes.len() as u8);
+        bytes.extend(char_bytes);
         match &self.line
         {
             Some(line) =>
             {
                 bytes.push(1);
                 bytes.extend(&line.len().to_le_bytes());
-                bytes.extend(line.iter().map(|&c| c as u8));
+                bytes.extend(line.iter().collect::<String>().as_bytes());
             }
             None =>
             {
@@ -81,20 +86,23 @@ impl Point
         cursor += 8;
         let pos_1 = byte(bytes, cursor);
         cursor += 8;
-        let char = bytes[cursor] as char;
+        let char_len = bytes[cursor] as usize;
         cursor += 1;
+        let char = std::str::from_utf8(&bytes[cursor..cursor + char_len])
+            .unwrap()
+            .chars()
+            .next()
+            .unwrap();
+        cursor += char_len;
         let line = if bytes[cursor] == 1
         {
             cursor += 1;
             let len = byte(bytes, cursor);
             cursor += 8;
-            let mut vec = Vec::with_capacity(len);
-            for _ in 0..len
-            {
-                vec.push(bytes[cursor] as char);
-                cursor += 1;
-            }
-            Some(vec)
+            let line_string = std::str::from_utf8(&bytes[cursor..cursor + len])
+                .unwrap()
+                .to_string();
+            Some(line_string.chars().collect())
         }
         else
         {
