@@ -172,8 +172,8 @@ fn main()
                         }
                         if history.pos != 0
                         {
+                            history.list.drain(..history.pos);
                             history.pos = 0;
-                            history.list.clear();
                         }
                         history.list.insert(
                             0,
@@ -209,8 +209,8 @@ fn main()
                             clear(&lines, line, placement, top, height);
                             if history.pos != 0
                             {
+                                history.list.drain(..history.pos);
                                 history.pos = 0;
-                                history.list.clear();
                             }
                             history.list.insert(
                                 0,
@@ -228,8 +228,8 @@ fn main()
                             placement -= 1;
                             if history.pos != 0
                             {
+                                history.list.drain(..history.pos);
                                 history.pos = 0;
-                                history.list.clear();
                             }
                             history.list.insert(
                                 0,
@@ -416,8 +416,16 @@ fn main()
                             }
                             else if placement < cursor || lines[line].len() < placement
                             {
-                                print!("\x1b[G\x1b[{}C", lines[line].len());
-                                placement = lines[line].len();
+                                if lines[line].is_empty()
+                                {
+                                    placement = 0;
+                                    print!("\x1b[G");
+                                }
+                                else
+                                {
+                                    placement = lines[line].len();
+                                    print!("\x1b[G\x1b[{}C", lines[line].len());
+                                }
                             }
                         }
                     }
@@ -490,8 +498,8 @@ fn main()
                         cursor = placement;
                         if history.pos != 0
                         {
+                            history.list.drain(..history.pos);
                             history.pos = 0;
-                            history.list.clear();
                         }
                         history.list.insert(
                             0,
@@ -592,8 +600,8 @@ fn main()
                             }
                             if history.pos != 0
                             {
+                                history.list.drain(..history.pos);
                                 history.pos = 0;
-                                history.list.clear();
                             }
                             history.list.insert(
                                 0,
@@ -615,8 +623,8 @@ fn main()
                         clear(&lines, line, placement, top, height);
                         if history.pos != 0
                         {
+                            history.list.drain(..history.pos);
                             history.pos = 0;
-                            history.list.clear();
                         }
                         history.list.insert(
                             0,
