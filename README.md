@@ -1,4 +1,6 @@
 # quec
+[![crates.io](https://img.shields.io/crates/v/kalc.svg)](https://crates.io/crates/kalc) [![AUR](https://img.shields.io/aur/version/kalc.svg)](https://aur.archlinux.org/packages/kalc/)
+
 history files located ``$HOME/.quec/`` ``C:\\Users\\USERNAME\\AppData\\Roaming\\quec``
 ## wont fix issues
 non-ascii characters that are not 1 char long messes stuff up
@@ -11,7 +13,7 @@ windows files are converted to linux
 
 requires modern terminal on windows, like windows terminal
 ## keybindings
-``i``to enter edit mode
+``i`` to enter edit mode
 
 ``esc`` to exit edit mode
 
