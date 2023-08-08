@@ -182,6 +182,15 @@ fn main()
                             if start != 0
                             {
                                 start = 0;
+                                if line == height + top
+                                {
+                                    top += 1;
+                                }
+                                clear(&files[n].lines, top, height, start, width);
+                            }
+                            else if line == height + top
+                            {
+                                top += 1;
                                 clear(&files[n].lines, top, height, start, width);
                             }
                         }
@@ -195,6 +204,10 @@ fn main()
                             placement = 0;
                             cursor = placement;
                             start = 0;
+                            if line == height + top
+                            {
+                                top += 1;
+                            }
                             clear(&files[n].lines, top, height, start, width);
                         }
                         fix_history(&mut history);
@@ -208,11 +221,6 @@ fn main()
                                 line: None,
                             },
                         );
-                        if line == height + top
-                        {
-                            top += 1;
-                            clear(&files[n].lines, top, height, start, width);
-                        }
                     }
                 }
                 '\x08' =>
@@ -427,23 +435,36 @@ fn main()
                         if line + 1 == top
                         {
                             top -= 1;
+                            if placement + 1 == start
+                            {
+                                start -= 1;
+                            }
                             clear(&files[n].lines, top, height, start, width);
                         }
                         else if start != s
                         {
+                            if placement + 1 == start
+                            {
+                                start -= 1;
+                            }
+                            clear(&files[n].lines, top, height, start, width);
+                        }
+                        else if placement + 1 == start
+                        {
+                            start -= 1;
                             clear(&files[n].lines, top, height, start, width);
                         }
                     }
                     else
                     {
                         placement -= 1;
+                        if placement + 1 == start
+                        {
+                            start -= 1;
+                            clear(&files[n].lines, top, height, start, width);
+                        }
                     }
                     cursor = placement;
-                    if placement + 1 == start
-                    {
-                        start -= 1;
-                        clear(&files[n].lines, top, height, start, width);
-                    }
                     if search
                     {
                         ln = Some((line, placement));
@@ -463,10 +484,23 @@ fn main()
                             if line == height + top
                             {
                                 top += 1;
+                                if placement == width + start
+                                {
+                                    start += 1;
+                                }
                                 clear(&files[n].lines, top, height, start, width);
                             }
                             else if start != s
                             {
+                                if placement == width + start
+                                {
+                                    start += 1;
+                                }
+                                clear(&files[n].lines, top, height, start, width);
+                            }
+                            else if placement == width + start
+                            {
+                                start += 1;
                                 clear(&files[n].lines, top, height, start, width);
                             }
                         }
@@ -474,13 +508,13 @@ fn main()
                     else
                     {
                         placement += 1;
+                        if placement == width + start
+                        {
+                            start += 1;
+                            clear(&files[n].lines, top, height, start, width);
+                        }
                     }
                     cursor = placement;
-                    if placement == width + start
-                    {
-                        start += 1;
-                        clear(&files[n].lines, top, height, start, width);
-                    }
                     if search
                     {
                         ln = Some((line, placement));
@@ -496,6 +530,10 @@ fn main()
                         if start != 0
                         {
                             start = 0;
+                            if line + 1 == top
+                            {
+                                top -= 1;
+                            }
                             clear(&files[n].lines, top, height, start, width);
                         }
                     }
@@ -523,14 +561,23 @@ fn main()
                             start = fix_top(start, placement, width);
                             if s != start
                             {
+                                if line + 1 == top
+                                {
+                                    top -= 1;
+                                }
+                                clear(&files[n].lines, top, height, start, width);
+                            }
+                            else if line + 1 == top
+                            {
+                                top -= 1;
                                 clear(&files[n].lines, top, height, start, width);
                             }
                         }
-                    }
-                    if line + 1 == top
-                    {
-                        top -= 1;
-                        clear(&files[n].lines, top, height, start, width);
+                        else if line + 1 == top
+                        {
+                            top -= 1;
+                            clear(&files[n].lines, top, height, start, width);
+                        }
                     }
                     if search
                     {
@@ -544,8 +591,13 @@ fn main()
                     {
                         placement = files[n].lines[line].len();
                         cursor = placement;
+                        if line == height + top
+                        {
+                            top += 1;
+                            clear(&files[n].lines, top, height, start, width);
+                        }
                     }
-                    if line + 1 != files[n].lines.len()
+                    else if line + 1 != files[n].lines.len()
                     {
                         line += 1;
                         if files[n].lines[line].is_empty()
@@ -567,13 +619,17 @@ fn main()
                         start = fix_top(start, placement, width);
                         if s != start
                         {
+                            if line == height + top
+                            {
+                                top += 1;
+                            }
                             clear(&files[n].lines, top, height, start, width);
                         }
-                    }
-                    if line == height + top
-                    {
-                        top += 1;
-                        clear(&files[n].lines, top, height, start, width);
+                        else if line == height + top
+                        {
+                            top += 1;
+                            clear(&files[n].lines, top, height, start, width);
+                        }
                     }
                     if search
                     {
@@ -658,13 +714,18 @@ fn main()
                     if edit
                     {
                         files[n].lines[line].insert(placement, c);
-                        clear_line(&files[n].lines, line, placement, width, start);
-                        placement += 1;
-                        cursor = placement;
-                        if placement == width + start
+                        if placement + 1 == width + start
                         {
+                            placement += 1;
+                            cursor = placement;
                             start += 1;
                             clear(&files[n].lines, top, height, start, width);
+                        }
+                        else
+                        {
+                            clear_line(&files[n].lines, line, placement, width, start);
+                            placement += 1;
+                            cursor = placement;
                         }
                         fix_history(&mut history);
                         history.list.insert(
