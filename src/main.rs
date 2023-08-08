@@ -1,7 +1,7 @@
 mod history;
 mod misc;
 use crate::misc::{
-    clear, clear_line, fix_top, get_dimensions, get_file, help, print_line_number,
+    clear, clear_line, fix_history, fix_top, get_dimensions, get_file, help, print_line_number,
     read_single_char, Files,
 };
 use console::Term;
@@ -197,11 +197,7 @@ fn main()
                             start = 0;
                             clear(&files[n].lines, top, height, start, width);
                         }
-                        if history.pos != 0
-                        {
-                            history.list.drain(..history.pos);
-                            history.pos = 0;
-                        }
+                        fix_history(&mut history);
                         history.list.insert(
                             0,
                             Point {
@@ -236,11 +232,7 @@ fn main()
                             files[n].lines[line].extend(t);
                             start = fix_top(start, placement, width);
                             clear(&files[n].lines, top, height, start, width);
-                            if history.pos != 0
-                            {
-                                history.list.drain(..history.pos);
-                                history.pos = 0;
-                            }
+                            fix_history(&mut history);
                             history.list.insert(
                                 0,
                                 Point {
@@ -255,18 +247,15 @@ fn main()
                         else
                         {
                             placement -= 1;
-                            if history.pos != 0
-                            {
-                                history.list.drain(..history.pos);
-                                history.pos = 0;
-                            }
+                            fix_history(&mut history);
+                            let ln = files[n].lines[line].remove(placement);
                             history.list.insert(
                                 0,
                                 Point {
                                     add: false,
                                     split: false,
                                     pos: (line, placement),
-                                    char: files[n].lines[line].remove(placement),
+                                    char: ln,
                                     line: None,
                                 },
                             );
@@ -677,11 +666,7 @@ fn main()
                             start += 1;
                             clear(&files[n].lines, top, height, start, width);
                         }
-                        if history.pos != 0
-                        {
-                            history.list.drain(..history.pos);
-                            history.pos = 0;
-                        }
+                        fix_history(&mut history);
                         history.list.insert(
                             0,
                             Point {
@@ -828,11 +813,7 @@ fn main()
                             clip = files[n].lines.remove(line);
                             clear(&files[n].lines, top, height, start, width);
                         }
-                        if history.pos != 0
-                        {
-                            history.list.drain(..history.pos);
-                            history.pos = 0;
-                        }
+                        fix_history(&mut history);
                         history.list.insert(
                             0,
                             Point {
@@ -852,11 +833,7 @@ fn main()
                         cursor = 0;
                         start = 0;
                         clear(&files[n].lines, top, height, start, width);
-                        if history.pos != 0
-                        {
-                            history.list.drain(..history.pos);
-                            history.pos = 0;
-                        }
+                        fix_history(&mut history);
                         history.list.insert(
                             0,
                             Point {

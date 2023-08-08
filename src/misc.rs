@@ -50,6 +50,14 @@ pub struct Files
     pub top: usize,
     pub cursor: usize,
 }
+pub fn fix_history(history: &mut History)
+{
+    if history.pos != 0
+    {
+        history.list.drain(..history.pos);
+        history.pos = 0;
+    }
+}
 pub fn fix_top(top: usize, line: usize, height: usize) -> usize
 {
     match top.cmp(&line)
