@@ -1,13 +1,18 @@
 mod history;
 use console::{Key, Term};
 use history::{History, Point};
-use libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ};
 use std::{
     cmp::Ordering,
     env::args,
     fs::{canonicalize, create_dir, File},
     io::{stdout, BufRead, BufReader, Read, Write},
-    mem,
+};
+#[cfg(not(unix))]
+use term_size::dimensions;
+#[cfg(unix)]
+use {
+    libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ},
+    std::mem,
 };
 //TODO package for windows
 //TODO word wrapping
@@ -42,7 +47,13 @@ fn main()
     let mut stdout = stdout();
     print!("\x1B[?1049h\x1B[H\x1B[J");
     stdout.flush().unwrap();
+    #[cfg(unix)]
     let history_dir = env!("HOME").to_owned() + "/.quec/";
+    #[cfg(not(unix))]
+    let history_dir = &format!(
+        "C:\\Users\\{}\\AppData\\Roaming\\quec",
+        var("USERNAME").unwrap()
+    );
     let _ = create_dir(history_dir.clone());
     let (height, width) = get_dimensions();
     'outer: for (n, i) in args.iter().enumerate()
@@ -69,12 +80,24 @@ fn main()
                         .collect::<Vec<char>>()
                 })
                 .collect::<Vec<Vec<char>>>();
-            history_file = history_dir.clone()
-                + &canonicalize(i.clone())
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .replace('/', "%");
+            #[cfg(unix)]
+            {
+                history_file = history_dir.clone()
+                    + &canonicalize(i.clone())
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .replace('/', "%");
+            }
+            #[cfg(not(unix))]
+            {
+                history_file = history_dir.clone()
+                    + &canonicalize(i.clone())
+                        .unwrap()
+                        .to_str()
+                        .unwrap()
+                        .replace('\\', "%");
+            }
             (
                 f,
                 if let Ok(mut f) = File::open(history_file.clone())
@@ -505,12 +528,24 @@ fn main()
                         {
                             if history_file.is_empty()
                             {
-                                history_file = history_dir.clone()
-                                    + &canonicalize(i.clone())
-                                        .unwrap()
-                                        .to_str()
-                                        .unwrap()
-                                        .replace('/', "%");
+                                #[cfg(unix)]
+                                {
+                                    history_file = history_dir.clone()
+                                        + &canonicalize(i.clone())
+                                            .unwrap()
+                                            .to_str()
+                                            .unwrap()
+                                            .replace('/', "%");
+                                }
+                                #[cfg(not(unix))]
+                                {
+                                    history_file = history_dir.clone()
+                                        + &canonicalize(i.clone())
+                                            .unwrap()
+                                            .to_str()
+                                            .unwrap()
+                                            .replace('\\', "%");
+                                }
                             }
                             File::create(history_file.clone())
                                 .unwrap()
@@ -887,12 +922,25 @@ fn read_single_char(term: &Term) -> char
         _ => '\0',
     }
 }
+#[cfg(unix)]
 fn get_dimensions() -> (usize, usize)
 {
     unsafe {
         let mut size: winsize = mem::zeroed();
         ioctl(STDOUT_FILENO, TIOCGWINSZ, &mut size);
         (size.ws_row as usize, size.ws_col as usize)
+    }
+}
+#[cfg(not(unix))]
+fn get_dimensions() -> (usize, usize)
+{
+    if let Some((width, height)) = dimensions()
+    {
+        (height, width)
+    }
+    else
+    {
+        (80, 80)
     }
 }
 fn help()

@@ -17,4 +17,9 @@ strip = true
 
 [dependencies]
 console      = "0.15.7"
+
+[target.'cfg(not(unix))'.dependencies]
+term_size    = "0.3.2"
+
+[target.'cfg(unix)'.dependencies]
 libc         = "0.2.147"
