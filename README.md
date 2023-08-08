@@ -17,6 +17,26 @@ requires modern terminal on windows, like windows terminal
 
 ``esc`` to exit edit mode
 
+``h`` left
+
+``l`` right
+
+``j`` down
+
+``k`` up
+
+``0`` move to beginning of line
+
+``$`` move to end of line
+
+``page down`` move 1 page down
+
+``page up`` move 1 page up
+
+``home`` go to start of file
+
+``end`` go to end of file
+
 ``y`` to copy line
 
 ``d`` to cut line

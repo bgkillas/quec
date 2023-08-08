@@ -12,6 +12,16 @@ pub fn help()
     println!(
         "'i' to enter edit mode\n\
 'esc' to exit edit mode\n\
+'h' left\n\
+'l' right\n\
+'j' down\n\
+'k' up\n\
+'0' move to beginning of line\n\
+'$' move to end of line\n\
+'page down' move 1 page down\n\
+'page up' move 1 page up\n\
+'home' go to start of file\n\
+'end' go to end of file\n\
 'y' to copy line\n\
 'd' to cut line\n\
 'p' to print line\n\

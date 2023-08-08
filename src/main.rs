@@ -337,10 +337,10 @@ fn main()
                 '\x03' =>
                 {
                     //page up
+                    placement = 0;
                     if line < height
                     {
                         top = 0;
-                        placement = 0;
                         line = 0;
                         let s = start;
                         start = fix_top(start, placement, width);
@@ -351,9 +351,15 @@ fn main()
                     }
                     else
                     {
-                        placement = 0;
                         line -= height;
-                        top -= height;
+                        if height < top
+                        {
+                            top -= height;
+                        }
+                        else
+                        {
+                            top = 0;
+                        }
                         start = fix_top(start, placement, width);
                         clear(&lines, top, height, start, width);
                     }
@@ -386,7 +392,7 @@ fn main()
                         ln = Some((line, placement));
                     }
                 }
-                '\x1B' =>
+                '\x1B' | 'h' if c != 'h' || !edit =>
                 {
                     //left
                     if placement == 0
@@ -424,7 +430,7 @@ fn main()
                         ln = Some((line, placement));
                     }
                 }
-                '\x1C' =>
+                '\x1C' | 'l' if c != 'l' || !edit =>
                 {
                     //right
                     if placement == lines[line].len()
@@ -461,7 +467,7 @@ fn main()
                         ln = Some((line, placement));
                     }
                 }
-                '\x1D' =>
+                '\x1D' | 'k' if c != 'k' || !edit =>
                 {
                     //up
                     if line == 0
@@ -511,7 +517,7 @@ fn main()
                         ln = Some((line, placement));
                     }
                 }
-                '\x1E' =>
+                '\x1E' | 'j' if c != 'j' || !edit =>
                 {
                     //down
                     if line + 1 == lines.len() && !lines[line].is_empty()
@@ -558,6 +564,24 @@ fn main()
                     edit = false;
                     search = false;
                     clear(&lines, top, height, start, width);
+                }
+                '0' if !edit =>
+                {
+                    placement = 0;
+                    if start != 0
+                    {
+                        start = 0;
+                        clear(&lines, top, height, start, width);
+                    }
+                }
+                '$' if !edit =>
+                {
+                    placement = lines[line].len();
+                    if placement - width > start
+                    {
+                        start = placement - width + 1;
+                        clear(&lines, top, height, start, width);
+                    }
                 }
                 _ if !c.is_ascii()
                     || c.is_ascii_graphic()
