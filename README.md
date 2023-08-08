@@ -1,5 +1,5 @@
 # quec
-[![crates.io](https://img.shields.io/crates/v/kalc.svg)](https://crates.io/crates/kalc) [![AUR](https://img.shields.io/aur/version/kalc.svg)](https://aur.archlinux.org/packages/kalc/)
+[![crates.io](https://img.shields.io/crates/v/quec.svg)](https://crates.io/crates/quec) [![AUR](https://img.shields.io/aur/version/quec.svg)](https://aur.archlinux.org/packages/quec/)
 
 history files located ``$HOME/.quec/`` ``C:\\Users\\USERNAME\\AppData\\Roaming\\quec``
 ## wont fix issues
