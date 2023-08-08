@@ -453,7 +453,16 @@ fn main()
                 '\x1D' =>
                 {
                     //up
-                    if line != 0
+                    if line == 0
+                    {
+                        placement = 0;
+                        if start != 0
+                        {
+                            start = 0;
+                            clear(&lines, top, height, start, width);
+                        }
+                    }
+                    else
                     {
                         line -= 1;
                         if cursor != 0
