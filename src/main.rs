@@ -158,7 +158,6 @@ fn main()
                         if line == lines.len() && placement == 0
                         {
                             lines.push(Vec::new());
-                            println!();
                             placement = 0;
                             cursor = placement;
                         }
@@ -169,7 +168,7 @@ fn main()
                             lines.remove(line - 1);
                             placement = 0;
                             cursor = placement;
-                            clear(&lines, line, placement, top, height);
+                            clear(&lines, top, height);
                         }
                         if history.pos != 0
                         {
@@ -189,7 +188,7 @@ fn main()
                         if line == height + top
                         {
                             top += 1;
-                            clear(&lines, line, placement, top, height);
+                            clear(&lines, top, height);
                         }
                     }
                 }
@@ -207,7 +206,7 @@ fn main()
                             placement = lines[line].len();
                             let t = lines.remove(line + 1);
                             lines[line].extend(t);
-                            clear(&lines, line, placement, top, height);
+                            clear(&lines, top, height);
                             if history.pos != 0
                             {
                                 history.list.drain(..history.pos);
@@ -249,9 +248,8 @@ fn main()
                             else
                             {
                                 print!(
-                                    "\x1B[K\x1B[G{}\x1B[{}D",
-                                    lines[line].iter().collect::<String>().replace('\t', " "),
-                                    lines[line].len() - placement
+                                    "\x1B[K\x1B[G{}",
+                                    lines[line].iter().collect::<String>().replace('\t', " ")
                                 );
                             }
                         }
@@ -266,11 +264,7 @@ fn main()
                     if lines.len() > height
                     {
                         top = 0;
-                        clear(&lines, line, placement, top, height);
-                    }
-                    else
-                    {
-                        print!("\x1b[H");
+                        clear(&lines, top, height);
                     }
                 }
                 '\x02' =>
@@ -281,29 +275,7 @@ fn main()
                     if lines.len() > height
                     {
                         top = lines.len() - height;
-                        clear(&lines, line, placement, top, height);
-                    }
-                    else
-                    {
-                        print!(
-                            "\x1b[H{}{}",
-                            if line == 0
-                            {
-                                String::new()
-                            }
-                            else
-                            {
-                                "\x1B[".to_owned() + &line.to_string() + "B"
-                            },
-                            if placement == 0
-                            {
-                                String::new()
-                            }
-                            else
-                            {
-                                "\x1B[".to_owned() + &placement.to_string() + "C"
-                            }
-                        );
+                        clear(&lines, top, height);
                     }
                 }
                 '\x03' =>
@@ -314,14 +286,13 @@ fn main()
                         top = 0;
                         placement = 0;
                         line = 0;
-                        print!("\x1b[H");
                     }
                     else
                     {
                         placement = 0;
                         line -= height;
                         top -= height;
-                        clear(&lines, line, placement, top, height);
+                        clear(&lines, top, height);
                     }
                 }
                 '\x04' =>
@@ -332,14 +303,14 @@ fn main()
                         top = lines.len().saturating_sub(height);
                         line = lines.len() - 1;
                         placement = lines[line].len();
-                        clear(&lines, line, placement, top, height);
+                        clear(&lines, top, height);
                     }
                     else
                     {
                         placement = 0;
                         line += height;
                         top += height;
-                        clear(&lines, line, placement, top, height);
+                        clear(&lines, top, height);
                     }
                 }
                 '\x1B' =>
@@ -353,24 +324,15 @@ fn main()
                         }
                         line -= 1;
                         placement = lines[line].len();
-                        if placement == 0
-                        {
-                            print!("\x1B[A");
-                        }
-                        else
-                        {
-                            print!("\x1B[A\x1b[{}C", placement);
-                        }
                         if line + 1 == top
                         {
                             top -= 1;
-                            clear(&lines, line, placement, top, height);
+                            clear(&lines, top, height);
                         }
                     }
                     else
                     {
                         placement -= 1;
-                        print!("\x1B[D",);
                     }
                     cursor = placement;
                 }
@@ -386,7 +348,7 @@ fn main()
                             if line == height + top
                             {
                                 top += 1;
-                                clear(&lines, line, placement, top, height);
+                                clear(&lines, top, height);
                             }
                             else
                             {
@@ -396,7 +358,6 @@ fn main()
                     }
                     else
                     {
-                        print!("\x1b[C",);
                         placement += 1;
                     }
                     cursor = placement;
@@ -407,12 +368,10 @@ fn main()
                     if line != 0
                     {
                         line -= 1;
-                        print!("\x1B[A");
                         if cursor != 0
                         {
                             if lines[line].len() > cursor
                             {
-                                print!("\x1b[G\x1b[{}C", cursor);
                                 placement = cursor;
                             }
                             else if placement < cursor || lines[line].len() < placement
@@ -420,12 +379,10 @@ fn main()
                                 if lines[line].is_empty()
                                 {
                                     placement = 0;
-                                    print!("\x1b[G");
                                 }
                                 else
                                 {
                                     placement = lines[line].len();
-                                    print!("\x1b[G\x1b[{}C", lines[line].len());
                                 }
                             }
                         }
@@ -433,7 +390,7 @@ fn main()
                     if line + 1 == top
                     {
                         top -= 1;
-                        clear(&lines, line, placement, top, height);
+                        clear(&lines, top, height);
                     }
                 }
                 '\x1E' =>
@@ -446,22 +403,18 @@ fn main()
                     if line + 1 != lines.len()
                     {
                         line += 1;
-                        print!("\x1B[B");
                         if lines[line].is_empty()
                         {
-                            print!("\x1b[G");
                             placement = 0;
                         }
                         else if cursor != 0
                         {
                             if lines[line].len() > cursor
                             {
-                                print!("\x1b[G\x1b[{}C", cursor);
                                 placement = cursor;
                             }
                             else if placement < cursor || lines[line].len() < placement
                             {
-                                print!("\x1b[G\x1b[{}C", lines[line].len());
                                 placement = lines[line].len();
                             }
                         }
@@ -469,7 +422,7 @@ fn main()
                     if line == height + top
                     {
                         top += 1;
-                        clear(&lines, line, placement, top, height);
+                        clear(&lines, top, height);
                     }
                 }
                 '\x1A' => edit = false,
@@ -479,21 +432,11 @@ fn main()
                     {
                         lines[line].insert(placement, c);
                         print!(
-                            "\x1B[K{}{}",
+                            "\x1B[K{}",
                             lines[line][placement..]
                                 .iter()
                                 .collect::<String>()
-                                .replace('\t', " "),
-                            if lines[line].len() - 1 == placement
-                            {
-                                String::new()
-                            }
-                            else
-                            {
-                                "\x1B[".to_owned()
-                                    + &((lines[line].len() - 1) - placement).to_string()
-                                    + "D"
-                            }
+                                .replace('\t', " ")
                         );
                         placement += 1;
                         cursor = placement;
@@ -593,7 +536,7 @@ fn main()
                                 clip = lines.remove(line);
                                 placement = 0;
                                 cursor = 0;
-                                clear(&lines, line, placement, top, height);
+                                clear(&lines, top, height);
                             }
                             if lines.is_empty()
                             {
@@ -621,7 +564,7 @@ fn main()
                         lines.insert(line, clip.clone());
                         placement = 0;
                         cursor = 0;
-                        clear(&lines, line, placement, top, height);
+                        clear(&lines, top, height);
                         if history.pos != 0
                         {
                             history.list.drain(..history.pos);
@@ -692,7 +635,7 @@ fn main()
                                                         Ordering::Equal => top,
                                                     };
                                                     cursor = placement;
-                                                    clear(&lines, line, placement, top, height);
+                                                    clear(&lines, top, height);
                                                     stdout.flush().unwrap();
                                                     break 'inner;
                                                 }
@@ -801,7 +744,7 @@ fn main()
                             }
                             Ordering::Equal => top,
                         };
-                        clear(&lines, line, placement, top, height);
+                        clear(&lines, top, height);
                         history.pos += 1;
                     }
                     else if (c == 'x' || c == 'y') && history.pos > 0
@@ -885,15 +828,14 @@ fn main()
                             }
                             Ordering::Equal => top,
                         };
-                        clear(&lines, line, placement, top, height);
+                        clear(&lines, top, height);
                     }
                 }
             }
             if debug
             {
                 print!(
-                    "\x1B[{}B\x1B[G\x1B[K{}\x1B[H{}{}",
-                    height,
+                    "\x1B[9999B\x1B[G\x1B[K{}\x1B[H{}{}",
                     time.unwrap().elapsed().as_nanos(),
                     if line == 0
                     {
@@ -913,6 +855,28 @@ fn main()
                     }
                 );
             }
+            print!(
+                "\x1B[G\x1B[9999B\x1B[{}C\x1B[K{},{}\x1B[H{}{}",
+                _width - 15,
+                line + 1,
+                placement + 1,
+                if line - top == 0
+                {
+                    String::new()
+                }
+                else
+                {
+                    "\x1B[".to_owned() + &(line - top).to_string() + "B"
+                },
+                if placement == 0
+                {
+                    String::new()
+                }
+                else
+                {
+                    "\x1B[".to_owned() + &placement.to_string() + "C"
+                }
+            );
             stdout.flush().unwrap();
         }
     }
@@ -962,10 +926,10 @@ search mode:\n\
 'enter' to search through file"
     );
 }
-fn clear(lines: &[Vec<char>], line: usize, placement: usize, top: usize, height: usize)
+fn clear(lines: &[Vec<char>], top: usize, height: usize)
 {
     print!(
-        "\x1B[H\x1B[J{}\x1B[H{}{}",
+        "\x1B[H\x1B[J{}",
         lines[top..if lines.len() < height + top
         {
             lines.len()
@@ -978,22 +942,6 @@ fn clear(lines: &[Vec<char>], line: usize, placement: usize, top: usize, height:
             .map(|vec| vec.iter().collect::<String>())
             .collect::<Vec<String>>()
             .join("\n")
-            .replace('\t', " "),
-        if line - top == 0
-        {
-            String::new()
-        }
-        else
-        {
-            "\x1B[".to_owned() + &(line - top).to_string() + "B"
-        },
-        if placement == 0
-        {
-            String::new()
-        }
-        else
-        {
-            "\x1B[".to_owned() + &placement.to_string() + "C"
-        }
+            .replace('\t', " ")
     );
 }
