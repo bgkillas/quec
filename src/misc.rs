@@ -1,6 +1,9 @@
 use crate::history::History;
 use console::{Key, Term};
-use std::{cmp::Ordering, fs::canonicalize};
+use std::{
+    cmp::{min, Ordering},
+    fs::canonicalize,
+};
 #[cfg(not(unix))]
 use term_size::dimensions;
 #[cfg(unix)]
@@ -126,15 +129,7 @@ pub fn clear_line(lines: &[Vec<char>], line: usize, placement: usize, width: usi
 {
     print!(
         "\x1B[K{}",
-        lines[line][placement
-            ..if lines[line].len() < width + start
-            {
-                lines[line].len()
-            }
-            else
-            {
-                width + start
-            }]
+        lines[line][placement..min(lines[line].len(), width + start)]
             .iter()
             .collect::<String>()
             .replace('\t', " ")
@@ -144,27 +139,12 @@ pub fn clear(lines: &[Vec<char>], top: usize, height: usize, start: usize, width
 {
     print!(
         "\x1B[H\x1B[J{}",
-        lines[top..if lines.len() < height + top
-        {
-            lines.len()
-        }
-        else
-        {
-            height + top
-        }]
+        lines[top..min(lines.len(), height + top)]
             .iter()
             .map(|vec| {
                 if start <= vec.len()
                 {
-                    vec[start
-                        ..if vec.len() < width + start
-                        {
-                            vec.len()
-                        }
-                        else
-                        {
-                            width + start
-                        }]
+                    vec[start..min(vec.len(), width + start)]
                         .iter()
                         .collect::<String>()
                 }
