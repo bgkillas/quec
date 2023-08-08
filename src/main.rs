@@ -12,6 +12,7 @@ use std::{
 //TODO word wrapping
 fn main()
 {
+    let term = Term::stdout();
     let mut args = args().collect::<Vec<String>>();
     args.remove(0);
     let mut debug = false;
@@ -142,7 +143,7 @@ fn main()
             {
                 history.list.clear();
             }
-            c = read_single_char();
+            c = read_single_char(&term);
             if debug
             {
                 time = Some(std::time::Instant::now());
@@ -639,31 +640,37 @@ fn main()
                     }
                     else if c == '/'
                     {
-                        let mut ln = (0, 0);
+                        let mut ln: Option<(usize, usize)> = None;
                         let mut word = Vec::new();
                         loop
                         {
-                            c = read_single_char();
+                            c = read_single_char(&term);
                             match c
                             {
                                 '\x1A' => break,
+                                '\x08' if !word.is_empty() =>
+                                {
+                                    word.pop();
+                                }
                                 _ =>
                                 {
                                     if c != '\n'
                                     {
-                                        ln = (0, 0);
+                                        ln = None;
                                         word.push(c);
                                     }
                                     'inner: for (l, i) in lines.iter().enumerate()
                                     {
-                                        if (l > ln.0 || ln.0 == 0) && word.len() < i.len()
+                                        if (ln.is_some_and(|x| l >= x.0) || ln.is_none())
+                                            && word.len() <= i.len()
                                         {
-                                            for j in if l == 0 { ln.1 + 1 } else { 0 }
-                                                ..=(i.len() - word.len())
+                                            for j in
+                                                if ln.is_none() { 0 } else { ln.unwrap().1 + 1 }
+                                                    ..=(i.len() - word.len())
                                             {
                                                 if i[j..j + word.len()] == word
                                                 {
-                                                    ln = (l, j);
+                                                    ln = Some((l, j));
                                                     top = match top.cmp(&line)
                                                     {
                                                         Ordering::Greater => line,
@@ -684,14 +691,14 @@ fn main()
                                                         }
                                                         Ordering::Equal => top,
                                                     };
-                                                    (line, placement) = ln;
+                                                    (line, placement) = ln.unwrap();
+                                                    cursor = placement;
                                                     clear(&lines, line, placement, top, height);
                                                     stdout.flush().unwrap();
-                                                    cursor = placement;
                                                     break 'inner;
                                                 }
                                             }
-                                            ln = (0, 0);
+                                            ln = None;
                                         }
                                     }
                                 }
@@ -911,9 +918,8 @@ fn main()
         }
     }
 }
-fn read_single_char() -> char
+fn read_single_char(term: &Term) -> char
 {
-    let term = Term::stdout();
     match term.read_key().unwrap()
     {
         Key::Char(c) => c,

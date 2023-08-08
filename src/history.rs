@@ -11,6 +11,7 @@ pub struct Point
     pub char: char,
     pub line: Option<Vec<char>>,
 }
+//stolen from chatgpt, probably is innefficient
 impl History
 {
     pub(crate) fn to_bytes(&self) -> Vec<u8>
