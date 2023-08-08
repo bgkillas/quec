@@ -16,7 +16,7 @@ lto = true
 strip = true
 
 [dependencies]
-console      = "0.15.7"
+console      = {version="0.15.7", default-features=false}
 
 [target.'cfg(not(unix))'.dependencies]
 term_size    = "0.3.2"
