@@ -1,6 +1,6 @@
 # quec
 history files located ``$HOME/.quec/`` ``C:\\Users\\USERNAME\\AppData\\Roaming\\quec``
-## issues
+## wont fix issues
 non-ascii characters that are not 1 char long messes stuff up
 
 0 width ascii characters are deleted
@@ -8,8 +8,6 @@ non-ascii characters that are not 1 char long messes stuff up
 tab looks like space
 
 windows files are converted to linux
-
-fails on longer then terminal width file
 
 requires modern terminal on windows, like windows terminal
 ## keybindings

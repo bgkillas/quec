@@ -1,6 +1,6 @@
 mod history;
 mod misc;
-use crate::misc::{clear, fix_top, get_dimensions, get_file, help, read_single_char};
+use crate::misc::{clear, clear_line, fix_top, get_dimensions, get_file, help, read_single_char};
 use console::Term;
 use history::{History, Point};
 #[cfg(not(unix))]
@@ -10,8 +10,6 @@ use std::{
     fs::{create_dir, File},
     io::{stdout, BufRead, BufReader, Read, Write},
 };
-//TODO package for windows
-//TODO word wrapping
 fn main()
 {
     let term = Term::stdout();
@@ -94,36 +92,18 @@ fn main()
                 },
             )
         };
+        let mut top = 0;
+        let mut start = 0;
         if lines.is_empty()
         {
             lines.push(Vec::new());
             print!("{}\x1B[H", "\n".repeat(height));
         }
-        else if lines.len() > height
-        {
-            print!(
-                "{}\x1B[H",
-                lines[..height]
-                    .iter()
-                    .map(|vec| vec.iter().collect::<String>())
-                    .collect::<Vec<String>>()
-                    .join("\n")
-                    .replace('\t', " "),
-            );
-        }
         else
         {
-            print!(
-                "{}{}\x1B[H",
-                lines
-                    .iter()
-                    .map(|vec| vec.iter().collect::<String>())
-                    .collect::<Vec<String>>()
-                    .join("\n")
-                    .replace('\t', " "),
-                "\n".repeat(height - lines.len())
-            );
+            clear(&lines, top, height, start, width);
         }
+        print!("\x1B[G\x1B[{}B\x1B[{}C\x1B[K1,1\x1B[H", height, width - 15,);
         stdout.flush().unwrap();
         let mut c;
         let mut placement: usize = 0;
@@ -135,15 +115,14 @@ fn main()
         let mut clip = Vec::new();
         let mut result: Vec<u8>;
         let mut cursor = 0;
-        let mut top = 0;
         let mut time = None;
         loop
         {
             if (height, width) != get_dimensions()
             {
                 (height, width) = get_dimensions();
-                top = fix_top(top, line, height);
-                clear(&lines, top, height);
+                (top, start) = (fix_top(top, line, height), fix_top(start, placement, width));
+                clear(&lines, top, height, start, width);
             }
             if history.list.len() >= 1000
             {
@@ -170,6 +149,11 @@ fn main()
                             lines.push(Vec::new());
                             placement = 0;
                             cursor = placement;
+                            if start != 0
+                            {
+                                start = 0;
+                                clear(&lines, top, height, start, width);
+                            }
                         }
                         else
                         {
@@ -178,7 +162,8 @@ fn main()
                             lines.remove(line - 1);
                             placement = 0;
                             cursor = placement;
-                            clear(&lines, top, height);
+                            start = 0;
+                            clear(&lines, top, height, start, width);
                         }
                         if history.pos != 0
                         {
@@ -198,7 +183,7 @@ fn main()
                         if line == height + top
                         {
                             top += 1;
-                            clear(&lines, top, height);
+                            clear(&lines, top, height, start, width);
                         }
                     }
                 }
@@ -216,7 +201,8 @@ fn main()
                             placement = lines[line].len();
                             let t = lines.remove(line + 1);
                             lines[line].extend(t);
-                            clear(&lines, top, height);
+                            start = fix_top(start, placement, width);
+                            clear(&lines, top, height, start, width);
                             if history.pos != 0
                             {
                                 history.list.drain(..history.pos);
@@ -253,14 +239,25 @@ fn main()
                             );
                             if placement == lines[line].len()
                             {
-                                print!("\x08\x1B[K");
+                                if placement + 1 == start
+                                {
+                                    start -= 1;
+                                    clear(&lines, top, height, start, width);
+                                }
+                                else
+                                {
+                                    print!("\x08\x1B[K");
+                                }
+                            }
+                            else if placement + 1 == start
+                            {
+                                start -= 1;
+                                clear(&lines, top, height, start, width);
                             }
                             else
                             {
-                                print!(
-                                    "\x1B[K\x1B[G{}",
-                                    lines[line].iter().collect::<String>().replace('\t', " ")
-                                );
+                                print!("\x08");
+                                clear_line(&lines, line, placement, width, start)
                             }
                         }
                         cursor = placement;
@@ -284,7 +281,17 @@ fn main()
                     if lines.len() > height
                     {
                         top = 0;
-                        clear(&lines, top, height);
+                        start = fix_top(start, placement, width);
+                        clear(&lines, top, height, start, width);
+                    }
+                    else
+                    {
+                        let s = start;
+                        start = fix_top(start, placement, width);
+                        if s != 0
+                        {
+                            clear(&lines, top, height, start, width);
+                        }
                     }
                     if search
                     {
@@ -299,7 +306,17 @@ fn main()
                     if lines.len() > height
                     {
                         top = lines.len() - height;
-                        clear(&lines, top, height);
+                        start = fix_top(start, placement, width);
+                        clear(&lines, top, height, start, width);
+                    }
+                    else
+                    {
+                        let s = start;
+                        start = fix_top(start, placement, width);
+                        if s != start
+                        {
+                            clear(&lines, top, height, start, width);
+                        }
                     }
                     if search
                     {
@@ -314,13 +331,20 @@ fn main()
                         top = 0;
                         placement = 0;
                         line = 0;
+                        let s = start;
+                        start = fix_top(start, placement, width);
+                        if s != 0
+                        {
+                            clear(&lines, top, height, start, width);
+                        }
                     }
                     else
                     {
                         placement = 0;
                         line -= height;
                         top -= height;
-                        clear(&lines, top, height);
+                        start = fix_top(start, placement, width);
+                        clear(&lines, top, height, start, width);
                     }
                     if search
                     {
@@ -335,14 +359,16 @@ fn main()
                         top = lines.len().saturating_sub(height);
                         line = lines.len() - 1;
                         placement = lines[line].len();
-                        clear(&lines, top, height);
+                        start = fix_top(start, placement, width);
+                        clear(&lines, top, height, start, width);
                     }
                     else
                     {
                         placement = 0;
                         line += height;
                         top += height;
-                        clear(&lines, top, height);
+                        start = fix_top(start, placement, width);
+                        clear(&lines, top, height, start, width);
                     }
                     if search
                     {
@@ -360,10 +386,16 @@ fn main()
                         }
                         line -= 1;
                         placement = lines[line].len();
+                        let s = start;
+                        start = fix_top(start, placement, width);
                         if line + 1 == top
                         {
                             top -= 1;
-                            clear(&lines, top, height);
+                            clear(&lines, top, height, start, width);
+                        }
+                        else if start != s
+                        {
+                            clear(&lines, top, height, start, width);
                         }
                     }
                     else
@@ -371,6 +403,11 @@ fn main()
                         placement -= 1;
                     }
                     cursor = placement;
+                    if placement + 1 == start
+                    {
+                        start -= 1;
+                        clear(&lines, top, height, start, width);
+                    }
                     if search
                     {
                         ln = Some((line, placement));
@@ -385,14 +422,16 @@ fn main()
                         {
                             placement = 0;
                             line += 1;
+                            let s = start;
+                            start = fix_top(start, placement, width);
                             if line == height + top
                             {
                                 top += 1;
-                                clear(&lines, top, height);
+                                clear(&lines, top, height, start, width);
                             }
-                            else
+                            else if start != s
                             {
-                                println!()
+                                clear(&lines, top, height, start, width);
                             }
                         }
                     }
@@ -401,6 +440,11 @@ fn main()
                         placement += 1;
                     }
                     cursor = placement;
+                    if placement == width + start
+                    {
+                        start += 1;
+                        clear(&lines, top, height, start, width);
+                    }
                     if search
                     {
                         ln = Some((line, placement));
@@ -429,12 +473,18 @@ fn main()
                                     placement = lines[line].len();
                                 }
                             }
+                            let s = start;
+                            start = fix_top(start, placement, width);
+                            if s != start
+                            {
+                                clear(&lines, top, height, start, width);
+                            }
                         }
                     }
                     if line + 1 == top
                     {
                         top -= 1;
-                        clear(&lines, top, height);
+                        clear(&lines, top, height, start, width);
                     }
                     if search
                     {
@@ -466,11 +516,17 @@ fn main()
                                 placement = lines[line].len();
                             }
                         }
+                        let s = start;
+                        start = fix_top(start, placement, width);
+                        if s != start
+                        {
+                            clear(&lines, top, height, start, width);
+                        }
                     }
                     if line == height + top
                     {
                         top += 1;
-                        clear(&lines, top, height);
+                        clear(&lines, top, height, start, width);
                     }
                     if search
                     {
@@ -481,20 +537,14 @@ fn main()
                 {
                     edit = false;
                     search = false;
-                    clear(&lines, top, height);
+                    clear(&lines, top, height, start, width);
                 }
                 _ if c.is_ascii_graphic() || c == ' ' || c == '\t' || c == '\n' =>
                 {
                     if edit
                     {
                         lines[line].insert(placement, c);
-                        print!(
-                            "\x1B[K{}",
-                            lines[line][placement..]
-                                .iter()
-                                .collect::<String>()
-                                .replace('\t', " ")
-                        );
+                        clear_line(&lines, line, placement, width, start);
                         placement += 1;
                         cursor = placement;
                         if history.pos != 0
@@ -538,9 +588,12 @@ fn main()
                                     {
                                         ln = Some((l, j));
                                         (line, placement) = ln.unwrap();
-                                        top = fix_top(top, line, height);
+                                        (top, start) = (
+                                            fix_top(top, line, height),
+                                            fix_top(start, placement, width),
+                                        );
                                         cursor = placement;
-                                        clear(&lines, top, height);
+                                        clear(&lines, top, height, start, width);
                                         print!(
                                             "\x1B[G\x1B[{}B\x1B[{}C\x1B[K{}",
                                             height,
@@ -611,6 +664,10 @@ fn main()
                                 .write_all(&history.to_bytes())
                                 .unwrap();
                         }
+                        else
+                        {
+                            std::fs::remove_file(history_file.clone()).unwrap();
+                        }
                     }
                     else if c == 'y'
                     {
@@ -631,7 +688,7 @@ fn main()
                             clip = lines.remove(line);
                             placement = 0;
                             cursor = 0;
-                            clear(&lines, top, height);
+                            clear(&lines, top, height, start, width);
                         }
                         if history.pos != 0
                         {
@@ -654,7 +711,7 @@ fn main()
                         lines.insert(line, clip.clone());
                         placement = 0;
                         cursor = 0;
-                        clear(&lines, top, height);
+                        clear(&lines, top, height, start, width);
                         if history.pos != 0
                         {
                             history.list.drain(..history.pos);
@@ -754,8 +811,9 @@ fn main()
                             _ => unimplemented!(),
                         }
                         cursor = placement;
-                        top = fix_top(top, line, height);
-                        clear(&lines, top, height);
+                        (top, start) =
+                            (fix_top(top, line, height), fix_top(start, placement, width));
+                        clear(&lines, top, height, start, width);
                         history.pos += 1;
                     }
                     else if c == 'x' && history.pos > 0
@@ -819,8 +877,9 @@ fn main()
                             _ => unimplemented!(),
                         }
                         cursor = placement;
-                        top = fix_top(top, line, height);
-                        clear(&lines, top, height);
+                        (top, start) =
+                            (fix_top(top, line, height), fix_top(start, placement, width));
+                        clear(&lines, top, height, start, width);
                     }
                 }
                 _ =>
@@ -849,13 +908,13 @@ fn main()
                 {
                     "\x1B[".to_owned() + &(line - top).to_string() + "B"
                 },
-                if placement == 0
+                if placement - start == 0
                 {
                     String::new()
                 }
                 else
                 {
-                    "\x1B[".to_owned() + &placement.to_string() + "C"
+                    "\x1B[".to_owned() + &(placement - start).to_string() + "C"
                 }
             );
             stdout.flush().unwrap();

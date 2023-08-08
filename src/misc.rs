@@ -89,7 +89,25 @@ pub fn get_dimensions() -> (usize, usize)
         (80, 80)
     }
 }
-pub fn clear(lines: &[Vec<char>], top: usize, height: usize)
+pub fn clear_line(lines: &[Vec<char>], line: usize, placement: usize, width: usize, start: usize)
+{
+    print!(
+        "\x1B[K{}",
+        lines[line][placement
+            ..if lines[line].len() < width + start
+            {
+                lines[line].len()
+            }
+            else
+            {
+                width + start
+            }]
+            .iter()
+            .collect::<String>()
+            .replace('\t', " ")
+    );
+}
+pub fn clear(lines: &[Vec<char>], top: usize, height: usize, start: usize, width: usize)
 {
     print!(
         "\x1B[H\x1B[J{}",
@@ -102,7 +120,26 @@ pub fn clear(lines: &[Vec<char>], top: usize, height: usize)
             height + top
         }]
             .iter()
-            .map(|vec| vec.iter().collect::<String>())
+            .map(|vec| {
+                if start <= vec.len()
+                {
+                    vec[start
+                        ..if vec.len() < width + start
+                        {
+                            vec.len()
+                        }
+                        else
+                        {
+                            width + start
+                        }]
+                        .iter()
+                        .collect::<String>()
+                }
+                else
+                {
+                    "".to_string()
+                }
+            })
             .collect::<Vec<String>>()
             .join("\n")
             .replace('\t', " ")
