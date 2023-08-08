@@ -681,10 +681,9 @@ fn main()
                                         .unwrap()
                                         .replace('\\', "%");
                                     history_file = history_dir.clone()
-                                        + &history_file[history_file.find(':').unwrap()..];
+                                        + &history_file[history_file.find(':').unwrap() + 1..];
                                 }
                             }
-                            println!("{}", history_file);
                             File::create(history_file.clone())
                                 .unwrap()
                                 .write_all(&history.to_bytes())
@@ -693,46 +692,40 @@ fn main()
                     }
                     else if c == 'y'
                     {
-                        if !lines.is_empty()
-                        {
-                            clip = lines[line].clone();
-                        }
+                        clip = lines[line].clone();
                     }
                     else if c == 'd'
                     {
-                        if !lines.is_empty()
+                        if line + 1 == lines.len()
                         {
-                            if line + 1 == lines.len()
-                            {
-                                clip = lines.pop().unwrap();
-                                lines.push(Vec::new());
-                                placement = 0;
-                                cursor = 0;
-                                print!("\x1b[G\x1b[K");
-                            }
-                            else
-                            {
-                                clip = lines.remove(line);
-                                placement = 0;
-                                cursor = 0;
-                                clear(&lines, top, height);
-                            }
-                            if history.pos != 0
-                            {
-                                history.list.drain(..history.pos);
-                                history.pos = 0;
-                            }
-                            history.list.insert(
-                                0,
-                                Point {
-                                    add: false,
-                                    split: false,
-                                    pos: (line, placement),
-                                    char: '\0',
-                                    line: Some(clip.clone()),
-                                },
-                            )
+                            clip = lines.pop().unwrap();
+                            lines.push(Vec::new());
+                            placement = 0;
+                            cursor = 0;
+                            print!("\x1b[G\x1b[K");
                         }
+                        else
+                        {
+                            clip = lines.remove(line);
+                            placement = 0;
+                            cursor = 0;
+                            clear(&lines, top, height);
+                        }
+                        if history.pos != 0
+                        {
+                            history.list.drain(..history.pos);
+                            history.pos = 0;
+                        }
+                        history.list.insert(
+                            0,
+                            Point {
+                                add: false,
+                                split: false,
+                                pos: (line, placement),
+                                char: '\0',
+                                line: Some(clip.clone()),
+                            },
+                        )
                     }
                     else if c == 'p'
                     {
