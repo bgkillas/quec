@@ -43,7 +43,7 @@ fn main()
     stdout.flush().unwrap();
     let history_dir = env!("HOME").to_owned() + "/.quec/";
     let _ = create_dir(history_dir.clone());
-    let (height, _width) = get_dimensions();
+    let (height, width) = get_dimensions();
     'outer: for (n, i) in args.iter().enumerate()
     {
         let mut history_file = String::new();
@@ -129,8 +129,6 @@ fn main()
         let mut clip = Vec::new();
         let mut result: Vec<u8>;
         let mut cursor = 0;
-        //let mut start = 0;
-        //let mut end = 0;
         let mut top = 0;
         let mut time = None;
         loop
@@ -835,29 +833,16 @@ fn main()
             if debug
             {
                 print!(
-                    "\x1B[9999B\x1B[G\x1B[K{}\x1B[H{}{}",
-                    time.unwrap().elapsed().as_nanos(),
-                    if line == 0
-                    {
-                        String::new()
-                    }
-                    else
-                    {
-                        "\x1B[".to_owned() + &line.to_string() + "B"
-                    },
-                    if placement == 0
-                    {
-                        String::new()
-                    }
-                    else
-                    {
-                        "\x1B[".to_owned() + &placement.to_string() + "C"
-                    }
+                    "\x1B[G\x1B[{}B\x1B[{}C\x1B[K{}",
+                    height,
+                    width - 30,
+                    time.unwrap().elapsed().as_nanos()
                 );
             }
             print!(
-                "\x1B[G\x1B[9999B\x1B[{}C\x1B[K{},{}\x1B[H{}{}",
-                _width - 15,
+                "\x1B[G\x1B[{}B\x1B[{}C\x1B[K{},{}\x1B[H{}{}",
+                height,
+                width - 15,
                 line + 1,
                 placement + 1,
                 if line - top == 0
@@ -918,8 +903,8 @@ fn help()
 'p' to print line\n\
 'w' to save\n\
 'q' to quit\n\
-'z' to undo\n\
-'x' to redo\n\
+'u'/'z' to undo\n\
+'y'/'x' to redo\n\
 '/' to start search mode\n\
 search mode:\n\
 'esc' to quit search mode\n\

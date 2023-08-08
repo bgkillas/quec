@@ -11,9 +11,9 @@
 
 'q' to quit
 
-'z' to undo
+'u'/'z' to undo
 
-'x' to redo
+'y'/'x' to redo
 
 '/' to start search mode
 
