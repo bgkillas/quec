@@ -309,6 +309,7 @@ fn main()
                             clear(&lines, top, height, start, width);
                         }
                     }
+                    cursor = placement;
                     if search
                     {
                         ln = Some((line, placement));
@@ -334,6 +335,7 @@ fn main()
                             clear(&lines, top, height, start, width);
                         }
                     }
+                    cursor = placement;
                     if search
                     {
                         ln = Some((line, placement));
@@ -368,6 +370,7 @@ fn main()
                         start = fix_top(start, placement, width);
                         clear(&lines, top, height, start, width);
                     }
+                    cursor = placement;
                     if search
                     {
                         ln = Some((line, placement));
@@ -389,9 +392,14 @@ fn main()
                         placement = 0;
                         line += height;
                         top += height;
+                        if top + height > lines.len()
+                        {
+                            top = lines.len() - height;
+                        }
                         start = fix_top(start, placement, width);
                         clear(&lines, top, height, start, width);
                     }
+                    cursor = placement;
                     if search
                     {
                         ln = Some((line, placement));
@@ -478,6 +486,7 @@ fn main()
                     if line == 0
                     {
                         placement = 0;
+                        cursor = 0;
                         if start != 0
                         {
                             start = 0;
@@ -527,7 +536,8 @@ fn main()
                     //down
                     if line + 1 == lines.len() && !lines[line].is_empty()
                     {
-                        lines.push(Vec::new());
+                        placement = lines[line].len();
+                        cursor = placement;
                     }
                     if line + 1 != lines.len()
                     {
