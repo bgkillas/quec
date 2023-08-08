@@ -1,19 +1,15 @@
 mod history;
-use console::{Key, Term};
+mod misc;
+use crate::misc::{clear, fix_top, get_dimensions, get_file, help, read_single_char};
+use console::Term;
 use history::{History, Point};
+#[cfg(not(unix))]
+use std::env::var;
 use std::{
-    cmp::Ordering,
     env::args,
-    fs::{canonicalize, create_dir, File},
+    fs::{create_dir, File},
     io::{stdout, BufRead, BufReader, Read, Write},
 };
-#[cfg(unix)]
-use {
-    libc::{ioctl, winsize, STDOUT_FILENO, TIOCGWINSZ},
-    std::mem,
-};
-#[cfg(not(unix))]
-use {std::env::var, term_size::dimensions};
 //TODO package for windows
 //TODO word wrapping
 fn main()
@@ -80,25 +76,7 @@ fn main()
                         .collect::<Vec<char>>()
                 })
                 .collect::<Vec<Vec<char>>>();
-            #[cfg(unix)]
-            {
-                history_file = history_dir.clone()
-                    + &canonicalize(i.clone())
-                        .unwrap()
-                        .to_str()
-                        .unwrap()
-                        .replace('/', "%");
-            }
-            #[cfg(not(unix))]
-            {
-                history_file = canonicalize(i.clone())
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .replace('\\', "%");
-                history_file =
-                    history_dir.clone() + &history_file[history_file.find(':').unwrap()..];
-            }
+            history_file = get_file(i.clone(), history_dir.clone());
             (
                 f,
                 if let Ok(mut f) = File::open(history_file.clone())
@@ -164,26 +142,7 @@ fn main()
             if (height, width) != get_dimensions()
             {
                 (height, width) = get_dimensions();
-                top = match top.cmp(&line)
-                {
-                    Ordering::Greater => line,
-                    Ordering::Less =>
-                    {
-                        if height > line
-                        {
-                            0
-                        }
-                        else if top + height > line
-                        {
-                            top
-                        }
-                        else
-                        {
-                            line - height + 1
-                        }
-                    }
-                    Ordering::Equal => top,
-                };
+                top = fix_top(top, line, height);
                 clear(&lines, top, height);
             }
             if history.list.len() >= 1000
@@ -579,26 +538,7 @@ fn main()
                                     {
                                         ln = Some((l, j));
                                         (line, placement) = ln.unwrap();
-                                        top = match top.cmp(&line)
-                                        {
-                                            Ordering::Greater => line,
-                                            Ordering::Less =>
-                                            {
-                                                if height > line
-                                                {
-                                                    0
-                                                }
-                                                else if top + height > line
-                                                {
-                                                    top
-                                                }
-                                                else
-                                                {
-                                                    line - height + 1
-                                                }
-                                            }
-                                            Ordering::Equal => top,
-                                        };
+                                        top = fix_top(top, line, height);
                                         cursor = placement;
                                         clear(&lines, top, height);
                                         print!(
@@ -664,25 +604,7 @@ fn main()
                         {
                             if history_file.is_empty()
                             {
-                                #[cfg(unix)]
-                                {
-                                    history_file = history_dir.clone()
-                                        + &canonicalize(i.clone())
-                                            .unwrap()
-                                            .to_str()
-                                            .unwrap()
-                                            .replace('/', "%");
-                                }
-                                #[cfg(not(unix))]
-                                {
-                                    history_file = canonicalize(i.clone())
-                                        .unwrap()
-                                        .to_str()
-                                        .unwrap()
-                                        .replace('\\', "%");
-                                    history_file = history_dir.clone()
-                                        + &history_file[history_file.find(':').unwrap() + 1..];
-                                }
+                                history_file = get_file(i.clone(), history_dir.clone());
                             }
                             File::create(history_file.clone())
                                 .unwrap()
@@ -832,26 +754,7 @@ fn main()
                             _ => unimplemented!(),
                         }
                         cursor = placement;
-                        top = match top.cmp(&line)
-                        {
-                            Ordering::Greater => line,
-                            Ordering::Less =>
-                            {
-                                if height > line
-                                {
-                                    0
-                                }
-                                else if top + height > line
-                                {
-                                    top
-                                }
-                                else
-                                {
-                                    line - height + 1
-                                }
-                            }
-                            Ordering::Equal => top,
-                        };
+                        top = fix_top(top, line, height);
                         clear(&lines, top, height);
                         history.pos += 1;
                     }
@@ -916,26 +819,7 @@ fn main()
                             _ => unimplemented!(),
                         }
                         cursor = placement;
-                        top = match top.cmp(&line)
-                        {
-                            Ordering::Greater => line,
-                            Ordering::Less =>
-                            {
-                                if height > line
-                                {
-                                    0
-                                }
-                                else if top + height > line
-                                {
-                                    top
-                                }
-                                else
-                                {
-                                    line - height + 1
-                                }
-                            }
-                            Ordering::Equal => top,
-                        };
+                        top = fix_top(top, line, height);
                         clear(&lines, top, height);
                     }
                 }
@@ -977,82 +861,4 @@ fn main()
             stdout.flush().unwrap();
         }
     }
-}
-fn read_single_char(term: &Term) -> char
-{
-    match term.read_key().unwrap()
-    {
-        Key::Char(c) => c,
-        Key::Enter => '\n',
-        Key::Backspace => '\x08',
-        Key::ArrowLeft => '\x1B',
-        Key::Home => '\x01',
-        Key::End => '\x02',
-        Key::PageUp => '\x03',
-        Key::PageDown => '\x04',
-        Key::ArrowRight => '\x1C',
-        Key::ArrowUp => '\x1D',
-        Key::ArrowDown => '\x1E',
-        Key::Escape => '\x1A',
-        Key::Tab => '\t',
-        _ => '\0',
-    }
-}
-#[cfg(unix)]
-fn get_dimensions() -> (usize, usize)
-{
-    unsafe {
-        let mut size: winsize = mem::zeroed();
-        ioctl(STDOUT_FILENO, TIOCGWINSZ, &mut size);
-        (size.ws_row as usize, size.ws_col as usize)
-    }
-}
-#[cfg(not(unix))]
-fn get_dimensions() -> (usize, usize)
-{
-    if let Some((width, height)) = dimensions()
-    {
-        (height, width)
-    }
-    else
-    {
-        (80, 80)
-    }
-}
-fn help()
-{
-    println!(
-        "'i' to enter edit mode\n\
-'esc' to exit edit mode\n\
-'y' to copy line\n\
-'d' to cut line\n\
-'p' to print line\n\
-'w' to save\n\
-'q' to quit\n\
-'u'/'z' to undo\n\
-'x' to redo\n\
-'/' to start search mode\n\
-search mode:\n\
-'esc' to quit search mode\n\
-'enter' to search through file"
-    );
-}
-fn clear(lines: &[Vec<char>], top: usize, height: usize)
-{
-    print!(
-        "\x1B[H\x1B[J{}",
-        lines[top..if lines.len() < height + top
-        {
-            lines.len()
-        }
-        else
-        {
-            height + top
-        }]
-            .iter()
-            .map(|vec| vec.iter().collect::<String>())
-            .collect::<Vec<String>>()
-            .join("\n")
-            .replace('\t', " ")
-    );
 }

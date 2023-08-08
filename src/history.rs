@@ -30,41 +30,14 @@ impl History
     pub(crate) fn from_bytes(bytes: &[u8]) -> History
     {
         let mut cursor = 0;
-        let pos = usize::from_le_bytes([
-            bytes[cursor],
-            bytes[cursor + 1],
-            bytes[cursor + 2],
-            bytes[cursor + 3],
-            bytes[cursor + 4],
-            bytes[cursor + 5],
-            bytes[cursor + 6],
-            bytes[cursor + 7],
-        ]);
+        let pos = byte(bytes, cursor);
         cursor += 8;
-        let list_len = usize::from_le_bytes([
-            bytes[cursor],
-            bytes[cursor + 1],
-            bytes[cursor + 2],
-            bytes[cursor + 3],
-            bytes[cursor + 4],
-            bytes[cursor + 5],
-            bytes[cursor + 6],
-            bytes[cursor + 7],
-        ]);
+        let list_len = byte(bytes, cursor);
         cursor += 8;
         let mut list = Vec::with_capacity(list_len);
         for _ in 0..list_len
         {
-            let point_size = usize::from_le_bytes([
-                bytes[cursor],
-                bytes[cursor + 1],
-                bytes[cursor + 2],
-                bytes[cursor + 3],
-                bytes[cursor + 4],
-                bytes[cursor + 5],
-                bytes[cursor + 6],
-                bytes[cursor + 7],
-            ]);
+            let point_size = byte(bytes, cursor);
             cursor += 8;
             let point_bytes = &bytes[cursor..cursor + point_size];
             list.push(Point::from_bytes(point_bytes));
@@ -104,43 +77,16 @@ impl Point
         cursor += 1;
         let split = bytes[cursor] != 0;
         cursor += 1;
-        let pos_0 = usize::from_le_bytes([
-            bytes[cursor],
-            bytes[cursor + 1],
-            bytes[cursor + 2],
-            bytes[cursor + 3],
-            bytes[cursor + 4],
-            bytes[cursor + 5],
-            bytes[cursor + 6],
-            bytes[cursor + 7],
-        ]);
+        let pos_0 = byte(bytes, cursor);
         cursor += 8;
-        let pos_1 = usize::from_le_bytes([
-            bytes[cursor],
-            bytes[cursor + 1],
-            bytes[cursor + 2],
-            bytes[cursor + 3],
-            bytes[cursor + 4],
-            bytes[cursor + 5],
-            bytes[cursor + 6],
-            bytes[cursor + 7],
-        ]);
+        let pos_1 = byte(bytes, cursor);
         cursor += 8;
         let char = bytes[cursor] as char;
         cursor += 1;
         let line = if bytes[cursor] == 1
         {
             cursor += 1;
-            let len = usize::from_le_bytes([
-                bytes[cursor],
-                bytes[cursor + 1],
-                bytes[cursor + 2],
-                bytes[cursor + 3],
-                bytes[cursor + 4],
-                bytes[cursor + 5],
-                bytes[cursor + 6],
-                bytes[cursor + 7],
-            ]);
+            let len = byte(bytes, cursor);
             cursor += 8;
             let mut vec = Vec::with_capacity(len);
             for _ in 0..len
@@ -162,4 +108,17 @@ impl Point
             line,
         }
     }
+}
+fn byte(bytes: &[u8], cursor: usize) -> usize
+{
+    usize::from_le_bytes([
+        bytes[cursor],
+        bytes[cursor + 1],
+        bytes[cursor + 2],
+        bytes[cursor + 3],
+        bytes[cursor + 4],
+        bytes[cursor + 5],
+        bytes[cursor + 6],
+        bytes[cursor + 7],
+    ])
 }
