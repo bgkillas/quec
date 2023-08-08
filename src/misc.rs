@@ -1,3 +1,4 @@
+use crate::history::History;
 use console::{Key, Term};
 use std::{cmp::Ordering, fs::canonicalize};
 #[cfg(not(unix))]
@@ -36,6 +37,18 @@ search mode:\n\
 'esc' to quit search mode\n\
 'enter' to search through file"
     );
+}
+pub struct Files
+{
+    pub lines: Vec<Vec<char>>,
+    pub history: History,
+    pub save_file: String,
+    pub history_file: String,
+    pub placement: usize,
+    pub line: usize,
+    pub start: usize,
+    pub top: usize,
+    pub cursor: usize,
 }
 pub fn fix_top(top: usize, line: usize, height: usize) -> usize
 {
@@ -155,6 +168,39 @@ pub fn clear(lines: &[Vec<char>], top: usize, height: usize, start: usize, width
             .collect::<Vec<String>>()
             .join("\n")
             .replace('\t', " ")
+    );
+}
+pub fn print_line_number(
+    height: usize,
+    width: usize,
+    line: usize,
+    placement: usize,
+    top: usize,
+    start: usize,
+)
+{
+    print!(
+        "\x1B[G\x1B[{}B\x1B[{}C\x1B[K{},{}\x1B[H{}{}",
+        height,
+        width - 15,
+        line + 1,
+        placement + 1,
+        if line - top == 0
+        {
+            String::new()
+        }
+        else
+        {
+            "\x1B[".to_owned() + &(line - top).to_string() + "B"
+        },
+        if placement - start == 0
+        {
+            String::new()
+        }
+        else
+        {
+            "\x1B[".to_owned() + &(placement - start).to_string() + "C"
+        }
     );
 }
 #[cfg(unix)]
