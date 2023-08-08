@@ -1,4 +1,15 @@
-# keybindings
+## issues
+non-ascii characters that are not 1 char long messes stuff up
+
+0 width ascii characters are deleted
+
+tab looks like space
+
+windows files are converted to linux
+
+fails on longer then terminal width file
+
+## keybindings
 'i' to enter edit mode
 
 'esc' to exit edit mode

@@ -9,6 +9,7 @@ use std::{
     io::{stdout, BufRead, BufReader, Read, Write},
     mem,
 };
+//TODO package for windows
 //TODO word wrapping
 fn main()
 {
