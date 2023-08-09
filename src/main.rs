@@ -1,15 +1,15 @@
 mod history;
 mod misc;
-use crate::misc::{
-    clear, clear_line, fix_history, fix_top, get_dimensions, get_file, help, print_line_number,
-    read_single_char, Files,
+use crate::{
+    history::{History, Point},
+    misc::{
+        clear, clear_line, fix_history, fix_top, get_dimensions, get_file, help, print_line_number,
+        read_single_char, Files,
+    },
 };
 use console::Term;
-use history::{History, Point};
-#[cfg(not(unix))]
-use std::env::var;
 use std::{
-    env::args,
+    env::{args, var},
     fs::{create_dir, File},
     io::{stdout, BufRead, BufReader, Read, Write},
 };
@@ -50,7 +50,7 @@ fn main()
     print!("\x1B[?1049h\x1B[H\x1B[J");
     stdout.flush().unwrap();
     #[cfg(unix)]
-    let history_dir = env!("HOME").to_owned() + "/.quec/";
+    let history_dir = var("HOME").unwrap() + "/.quec/";
     #[cfg(not(unix))]
     let history_dir = &format!(
         "C:\\Users\\{}\\AppData\\Roaming\\quec\\",
@@ -646,7 +646,7 @@ fn main()
                     search = false;
                     clear(&files[n].lines, top, height, start, width);
                 }
-                '`' if !edit && n + 1 != files.len() =>
+                '`' if !edit && !search && n + 1 != files.len() =>
                 {
                     //next file
                     files[n] = Files {
@@ -665,7 +665,7 @@ fn main()
                     stdout.flush().unwrap();
                     continue 'outer;
                 }
-                '~' if !edit && n != 0 =>
+                '~' if !edit && !search && n != 0 =>
                 {
                     //last file
                     files[n] = Files {
@@ -694,6 +694,10 @@ fn main()
                         start = 0;
                         clear(&files[n].lines, top, height, start, width);
                     }
+                    if search
+                    {
+                        ln = Some((line, placement));
+                    }
                 }
                 '$' if !edit =>
                 {
@@ -704,6 +708,10 @@ fn main()
                     {
                         start = placement - width + 1;
                         clear(&files[n].lines, top, height, start, width);
+                    }
+                    if search
+                    {
+                        ln = Some((line, placement));
                     }
                 }
                 '\0' =>
