@@ -828,10 +828,14 @@ fn main()
                             }
                         }
                         result.push(b'\n');
-                        File::create(save_file.clone())
-                            .unwrap()
-                            .write_all(&result)
-                            .unwrap();
+                        match File::create(save_file.clone())
+                        {
+                            Ok(mut n) => n.write_all(&result).unwrap(),
+                            Err(e) =>
+                            {
+                                print!("\x1B[G\x1B[{}B\x1B[{}C\x1B[K{}", height, width - 60, e)
+                            }
+                        }
                         loop
                         {
                             if !history.list.is_empty()
