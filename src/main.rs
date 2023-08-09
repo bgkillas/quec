@@ -9,6 +9,7 @@ use crate::{
 };
 use console::Term;
 use std::{
+    cmp::min,
     env::{args, var},
     fs::{create_dir, File},
     io::{stdout, BufRead, BufReader, Read, Write},
@@ -797,16 +798,17 @@ fn main()
                     else if c == 'w'
                     {
                         //save
-                        result = files[n]
+                        files[n].lines = files[n]
                             .lines
                             .iter()
                             .map(|line| {
-                                line.iter()
-                                    .collect::<String>()
-                                    .trim_end()
-                                    .as_bytes()
-                                    .to_vec()
+                                line.iter().collect::<String>().trim_end().chars().collect()
                             })
+                            .collect();
+                        result = files[n]
+                            .lines
+                            .iter()
+                            .map(|line| line.iter().collect::<String>().as_bytes().to_vec())
                             .flat_map(|mut line| {
                                 line.push(b'\n');
                                 line.into_iter()
@@ -862,6 +864,10 @@ fn main()
                         {
                             let _ = std::fs::remove_file(history_file.clone());
                         }
+                        line = min(line, files[n].lines.len() - 1);
+                        placement = min(placement, files[n].lines[line].len());
+                        (top, start) =
+                            (fix_top(top, line, height), fix_top(start, placement, width));
                     }
                     else if c == 'y'
                     {
