@@ -587,17 +587,20 @@ fn main()
                 '\x1E' | 'j' if c != 'j' || !edit =>
                 {
                     //down
-                    if line + 1 == files[n].lines.len() && !files[n].lines[line].is_empty()
+                    if line + 1 == files[n].lines.len()
                     {
-                        placement = files[n].lines[line].len();
-                        cursor = placement;
-                        if line == height + top
+                        if !files[n].lines[line].is_empty()
                         {
-                            top += 1;
-                            clear(&files[n].lines, top, height, start, width);
+                            placement = files[n].lines[line].len();
+                            cursor = placement;
+                            if line == height + top
+                            {
+                                top += 1;
+                                clear(&files[n].lines, top, height, start, width);
+                            }
                         }
                     }
-                    else if line + 1 != files[n].lines.len()
+                    else
                     {
                         line += 1;
                         if files[n].lines[line].is_empty()
