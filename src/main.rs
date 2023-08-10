@@ -193,6 +193,7 @@ fn main()
                             files[n].lines[line].extend(t);
                             start = fix_top(start, placement, width);
                             clear(&files[n].lines, top, height, start, width);
+                            print!("\n\x1B[K");
                             fix_history(&mut files[n].history);
                             files[n].history.list.insert(
                                 0,
