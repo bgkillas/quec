@@ -16,7 +16,7 @@ pub struct Point
 //stolen from chatgpt, probably is innefficient
 impl History
 {
-    pub(crate) fn to_bytes(&self) -> Vec<u8>
+    pub fn to_bytes(&self) -> Vec<u8>
     {
         let mut bytes = Vec::new();
         bytes.extend(&self.pos.to_le_bytes());
@@ -29,7 +29,7 @@ impl History
         }
         bytes
     }
-    pub(crate) fn from_bytes(bytes: &[u8]) -> History
+    pub fn from_bytes(bytes: &[u8]) -> History
     {
         let mut cursor = 0;
         let pos = byte(bytes, cursor);

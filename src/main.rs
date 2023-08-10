@@ -1,10 +1,12 @@
+mod file;
 mod history;
 mod misc;
 use crate::{
+    file::{get_word, open_file, save_file, Files},
     history::{History, Point},
     misc::{
-        clear, clear_line, fix_history, fix_top, get_dimensions, get_word, help, open_file,
-        print_line_number, read_single_char, save_file, Files,
+        clear, clear_line, fix_history, fix_top, get_dimensions, help, print_line_number,
+        read_single_char,
     },
 };
 use console::Term;
@@ -20,11 +22,11 @@ fn main()
     let mut args = args().collect::<Vec<String>>();
     args.remove(0);
     let mut debug = false;
-    'outer: loop
+    loop
     {
         if args.is_empty()
         {
-            break 'outer;
+            break;
         }
         match args[0].as_str()
         {
@@ -82,15 +84,11 @@ fn main()
     {
         let mut top = files[n].top;
         let mut start = files[n].start;
-        clear(&files[n].lines, top, height, start, width);
         let mut line = files[n].line;
         let mut placement = files[n].placement;
+        clear(&files[n].lines, top, height, start, width);
         print_line_number(height, line, placement, top, start, String::new());
         stdout.flush().unwrap();
-        let mut history = files[n].history.clone();
-        let save_file_path = files[n].save_file_path.clone();
-        let mut cursor = files[n].cursor;
-        let mut c;
         let mut err = String::new();
         let mut edit = false;
         let mut search = false;
@@ -108,15 +106,15 @@ fn main()
                 start = fix_top(start, placement, width);
                 clear(&files[n].lines, top, height, start, width);
             }
-            if history.list.len() >= 1000
+            if files[n].history.list.len() >= 1000
             {
-                history.list.drain(1000..);
+                files[n].history.list.drain(1000..);
             }
-            if history.pos > history.list.len()
+            if files[n].history.pos > files[n].history.list.len()
             {
-                history.list.clear();
+                files[n].history.list.clear();
             }
-            c = read_single_char(&term);
+            let c = read_single_char(&term);
             if debug
             {
                 time = Some(std::time::Instant::now());
@@ -133,7 +131,7 @@ fn main()
                         {
                             files[n].lines.push(Vec::new());
                             placement = 0;
-                            cursor = placement;
+                            files[n].cursor = placement;
                             if start != 0
                             {
                                 start = 0;
@@ -157,7 +155,7 @@ fn main()
                             files[n].lines.insert(line, ln);
                             files[n].lines.remove(line - 1);
                             placement = 0;
-                            cursor = placement;
+                            files[n].cursor = placement;
                             start = 0;
                             if line == height + top
                             {
@@ -165,8 +163,8 @@ fn main()
                             }
                             clear(&files[n].lines, top, height, start, width);
                         }
-                        fix_history(&mut history);
-                        history.list.insert(
+                        fix_history(&mut files[n].history);
+                        files[n].history.list.insert(
                             0,
                             Point {
                                 add: true,
@@ -195,8 +193,8 @@ fn main()
                             files[n].lines[line].extend(t);
                             start = fix_top(start, placement, width);
                             clear(&files[n].lines, top, height, start, width);
-                            fix_history(&mut history);
-                            history.list.insert(
+                            fix_history(&mut files[n].history);
+                            files[n].history.list.insert(
                                 0,
                                 Point {
                                     add: false,
@@ -210,9 +208,9 @@ fn main()
                         else
                         {
                             placement -= 1;
-                            fix_history(&mut history);
+                            fix_history(&mut files[n].history);
                             let ln = files[n].lines[line].remove(placement);
-                            history.list.insert(
+                            files[n].history.list.insert(
                                 0,
                                 Point {
                                     add: false,
@@ -245,7 +243,7 @@ fn main()
                                 clear_line(&files[n].lines, line, placement, width, start)
                             }
                         }
-                        cursor = placement;
+                        files[n].cursor = placement;
                     }
                     else if search && !word.is_empty()
                     {
@@ -272,7 +270,7 @@ fn main()
                             clear(&files[n].lines, top, height, start, width);
                         }
                     }
-                    cursor = placement;
+                    files[n].cursor = placement;
                     if search
                     {
                         ln = (line, placement);
@@ -298,7 +296,7 @@ fn main()
                             clear(&files[n].lines, top, height, start, width);
                         }
                     }
-                    cursor = placement;
+                    files[n].cursor = placement;
                     if search
                     {
                         ln = (line, placement);
@@ -333,7 +331,7 @@ fn main()
                         start = fix_top(start, placement, width);
                         clear(&files[n].lines, top, height, start, width);
                     }
-                    cursor = placement;
+                    files[n].cursor = placement;
                     if search
                     {
                         ln = (line, placement);
@@ -362,7 +360,7 @@ fn main()
                         start = fix_top(start, placement, width);
                         clear(&files[n].lines, top, height, start, width);
                     }
-                    cursor = placement;
+                    files[n].cursor = placement;
                     if search
                     {
                         ln = (line, placement);
@@ -413,7 +411,7 @@ fn main()
                             clear(&files[n].lines, top, height, start, width);
                         }
                     }
-                    cursor = placement;
+                    files[n].cursor = placement;
                     if search
                     {
                         ln = (line, placement);
@@ -463,7 +461,7 @@ fn main()
                             clear(&files[n].lines, top, height, start, width);
                         }
                     }
-                    cursor = placement;
+                    files[n].cursor = placement;
                     if search
                     {
                         ln = (line, placement);
@@ -475,7 +473,7 @@ fn main()
                     if line == 0
                     {
                         placement = 0;
-                        cursor = 0;
+                        files[n].cursor = 0;
                         if start != 0
                         {
                             start = 0;
@@ -489,13 +487,14 @@ fn main()
                     else
                     {
                         line -= 1;
-                        if cursor != 0
+                        if files[n].cursor != 0
                         {
-                            if files[n].lines[line].len() > cursor
+                            if files[n].lines[line].len() > files[n].cursor
                             {
-                                placement = cursor;
+                                placement = files[n].cursor;
                             }
-                            else if placement < cursor || files[n].lines[line].len() < placement
+                            else if placement < files[n].cursor
+                                || files[n].lines[line].len() < placement
                             {
                                 if files[n].lines[line].is_empty()
                                 {
@@ -541,7 +540,7 @@ fn main()
                         if !files[n].lines[line].is_empty()
                         {
                             placement = files[n].lines[line].len();
-                            cursor = placement;
+                            files[n].cursor = placement;
                             if line == height + top
                             {
                                 top += 1;
@@ -556,13 +555,14 @@ fn main()
                         {
                             placement = 0;
                         }
-                        else if cursor != 0
+                        else if files[n].cursor != 0
                         {
-                            if files[n].lines[line].len() > cursor
+                            if files[n].lines[line].len() > files[n].cursor
                             {
-                                placement = cursor;
+                                placement = files[n].cursor;
                             }
-                            else if placement < cursor || files[n].lines[line].len() < placement
+                            else if placement < files[n].cursor
+                                || files[n].lines[line].len() < placement
                             {
                                 placement = files[n].lines[line].len();
                             }
@@ -598,17 +598,10 @@ fn main()
                 '`' if !edit && !search && n + 1 != files.len() =>
                 {
                     //next file
-                    files[n] = Files {
-                        lines: files[n].lines.clone(),
-                        history,
-                        save_file_path,
-                        history_file: files[n].history_file.clone(),
-                        placement,
-                        line,
-                        start,
-                        top,
-                        cursor,
-                    };
+                    files[n].placement = placement;
+                    files[n].line = line;
+                    files[n].start = start;
+                    files[n].top = top;
                     n += 1;
                     print!("\x1B[H\x1B[J");
                     stdout.flush().unwrap();
@@ -617,17 +610,10 @@ fn main()
                 '~' if !edit && !search && n != 0 =>
                 {
                     //last file
-                    files[n] = Files {
-                        lines: files[n].lines.clone(),
-                        history,
-                        save_file_path,
-                        history_file: files[n].history_file.clone(),
-                        placement,
-                        line,
-                        start,
-                        top,
-                        cursor,
-                    };
+                    files[n].placement = placement;
+                    files[n].line = line;
+                    files[n].start = start;
+                    files[n].top = top;
                     n -= 1;
                     print!("\x1B[H\x1B[J");
                     stdout.flush().unwrap();
@@ -637,7 +623,7 @@ fn main()
                 {
                     //start of line
                     placement = 0;
-                    cursor = placement;
+                    files[n].cursor = placement;
                     if start != 0
                     {
                         start = 0;
@@ -652,7 +638,7 @@ fn main()
                 {
                     //end of line
                     placement = files[n].lines[line].len();
-                    cursor = placement;
+                    files[n].cursor = placement;
                     if placement > start + width
                     {
                         start = placement - width + 1;
@@ -681,7 +667,7 @@ fn main()
                 {
                     //cut line
                     placement = 0;
-                    cursor = 0;
+                    files[n].cursor = 0;
                     start = 0;
                     if line + 1 == files[n].lines.len()
                     {
@@ -694,8 +680,8 @@ fn main()
                         clip = files[n].lines.remove(line);
                         clear(&files[n].lines, top, height, start, width);
                     }
-                    fix_history(&mut history);
-                    history.list.insert(
+                    fix_history(&mut files[n].history);
+                    files[n].history.list.insert(
                         0,
                         Point {
                             add: false,
@@ -711,11 +697,11 @@ fn main()
                     //paste line
                     files[n].lines.insert(line, clip.clone());
                     placement = 0;
-                    cursor = 0;
+                    files[n].cursor = 0;
                     start = 0;
                     clear(&files[n].lines, top, height, start, width);
-                    fix_history(&mut history);
-                    history.list.insert(
+                    fix_history(&mut files[n].history);
+                    files[n].history.list.insert(
                         0,
                         Point {
                             add: true,
@@ -745,134 +731,140 @@ fn main()
                     //enable edit mode
                     edit = true;
                 }
-                'u' if !edit && !search && history.list.len() != history.pos =>
+                'u' if !edit && !search && files[n].history.list.len() != files[n].history.pos =>
                 {
                     //undo
                     match (
-                        history.list[history.pos].add,
-                        history.list[history.pos].split,
-                        &history.list[history.pos].line,
+                        files[n].history.list[files[n].history.pos].add,
+                        files[n].history.list[files[n].history.pos].split,
+                        files[n].history.list[files[n].history.pos].line.clone(),
                     )
                     {
                         (false, false, None) =>
                         {
-                            line = history.list[history.pos].pos.0;
-                            placement = history.list[history.pos].pos.1;
+                            line = files[n].history.list[files[n].history.pos].pos.0;
+                            placement = files[n].history.list[files[n].history.pos].pos.1;
                             if line == files[n].lines.len()
                             {
                                 files[n].lines.push(Vec::new());
                             }
-                            files[n].lines[line].insert(placement, history.list[history.pos].char);
+                            let char = files[n].history.list[files[n].history.pos].char;
+                            files[n].lines[line].insert(placement, char);
                             placement += 1;
                         }
                         (true, false, None) =>
                         {
-                            line = history.list[history.pos].pos.0;
-                            placement = history.list[history.pos].pos.1 - 1;
+                            line = files[n].history.list[files[n].history.pos].pos.0;
+                            placement = files[n].history.list[files[n].history.pos].pos.1 - 1;
                             files[n].lines[line].remove(placement);
                         }
                         (false, true, None) =>
                         {
-                            line = history.list[history.pos].pos.0 + 1;
+                            line = files[n].history.list[files[n].history.pos].pos.0 + 1;
                             placement = 0;
-                            let l = files[n].lines[line - 1]
-                                .drain(history.list[history.pos].pos.1..)
-                                .collect();
+                            let pos = files[n].history.list[files[n].history.pos].pos.1;
+                            let l = files[n].lines[line - 1].drain(pos..).collect();
                             files[n].lines.insert(line, l);
                         }
                         (true, true, None) =>
                         {
-                            line = history.list[history.pos].pos.0 - 1;
+                            line = files[n].history.list[files[n].history.pos].pos.0 - 1;
                             placement = files[n].lines[line].len();
                             let l = files[n].lines.remove(line + 1);
                             files[n].lines[line].extend(l);
                         }
                         (false, false, Some(l)) =>
                         {
-                            line = history.list[history.pos].pos.0;
+                            line = files[n].history.list[files[n].history.pos].pos.0;
                             placement = 0;
                             if line == files[n].lines.len()
                             {
-                                files[n].lines.push(Vec::new());
+                                files[n].lines.push(l.clone());
                             }
-                            files[n].lines.insert(line, l.clone());
+                            else
+                            {
+                                files[n].lines.insert(line, l.clone());
+                            }
                         }
                         (true, false, Some(_)) =>
                         {
-                            line = history.list[history.pos].pos.0;
+                            line = files[n].history.list[files[n].history.pos].pos.0;
                             placement = 0;
                             files[n].lines.remove(line);
                         }
                         _ => unimplemented!(),
                     }
-                    cursor = placement;
+                    files[n].cursor = placement;
                     top = fix_top(top, line, height);
                     start = fix_top(start, placement, width);
                     clear(&files[n].lines, top, height, start, width);
-                    history.pos += 1;
+                    files[n].history.pos += 1;
                 }
-                'U' if !edit && !search && history.pos > 0 =>
+                'U' if !edit && !search && files[n].history.pos > 0 =>
                 {
                     //redo
-                    history.pos -= 1;
+                    files[n].history.pos -= 1;
                     match (
-                        history.list[history.pos].add,
-                        history.list[history.pos].split,
-                        &history.list[history.pos].line,
+                        files[n].history.list[files[n].history.pos].add,
+                        files[n].history.list[files[n].history.pos].split,
+                        files[n].history.list[files[n].history.pos].line.clone(),
                     )
                     {
                         (false, false, None) =>
                         {
-                            line = history.list[history.pos].pos.0;
-                            placement = history.list[history.pos].pos.1;
+                            line = files[n].history.list[files[n].history.pos].pos.0;
+                            placement = files[n].history.list[files[n].history.pos].pos.1;
                             files[n].lines[line].remove(placement);
                         }
                         (true, false, None) =>
                         {
-                            line = history.list[history.pos].pos.0;
-                            placement = history.list[history.pos].pos.1 - 1;
-                            files[n].lines[line].insert(placement, history.list[history.pos].char);
+                            line = files[n].history.list[files[n].history.pos].pos.0;
+                            placement = files[n].history.list[files[n].history.pos].pos.1 - 1;
+                            let char = files[n].history.list[files[n].history.pos].char;
+                            files[n].lines[line].insert(placement, char);
                             placement += 1;
                         }
                         (false, true, None) =>
                         {
-                            line = history.list[history.pos].pos.0;
+                            line = files[n].history.list[files[n].history.pos].pos.0;
                             placement = files[n].lines[line].len();
                             let l = files[n].lines.remove(line + 1);
                             files[n].lines[line].extend(l);
                         }
                         (true, true, None) =>
                         {
-                            line = history.list[history.pos].pos.0;
+                            line = files[n].history.list[files[n].history.pos].pos.0;
                             placement = 0;
                             if line == files[n].lines.len()
                             {
                                 files[n].lines.push(Vec::new())
                             }
-                            let l = files[n].lines[line]
-                                .drain(history.list[history.pos].pos.1..)
-                                .collect();
+                            let pos = files[n].history.list[files[n].history.pos].pos.1;
+                            let l = files[n].lines[line].drain(pos..).collect();
                             files[n].lines.insert(line, l);
                         }
                         (false, false, Some(_)) =>
                         {
-                            line = history.list[history.pos].pos.0;
+                            line = files[n].history.list[files[n].history.pos].pos.0;
                             placement = 0;
                             files[n].lines.remove(line);
                         }
                         (true, false, Some(l)) =>
                         {
-                            line = history.list[history.pos].pos.0;
+                            line = files[n].history.list[files[n].history.pos].pos.0;
                             placement = 0;
                             if line == files[n].lines.len()
                             {
-                                files[n].lines.push(Vec::new());
+                                files[n].lines.push(l.clone());
                             }
-                            files[n].lines.insert(line, l.clone());
+                            else
+                            {
+                                files[n].lines.insert(line, l.clone());
+                            }
                         }
                         _ => unimplemented!(),
                     }
-                    cursor = placement;
+                    files[n].cursor = placement;
                     top = fix_top(top, line, height);
                     start = fix_top(start, placement, width);
                     clear(&files[n].lines, top, height, start, width);
@@ -937,7 +929,7 @@ fn main()
                         if placement + 1 == width + start
                         {
                             placement += 1;
-                            cursor = placement;
+                            files[n].cursor = placement;
                             start += 1;
                             clear(&files[n].lines, top, height, start, width);
                         }
@@ -945,10 +937,10 @@ fn main()
                         {
                             clear_line(&files[n].lines, line, placement, width, start);
                             placement += 1;
-                            cursor = placement;
+                            files[n].cursor = placement;
                         }
-                        fix_history(&mut history);
-                        history.list.insert(
+                        fix_history(&mut files[n].history);
+                        files[n].history.list.insert(
                             0,
                             Point {
                                 add: true,
@@ -979,7 +971,7 @@ fn main()
                                         (line, placement) = ln;
                                         top = fix_top(top, line, height);
                                         start = fix_top(start, placement, width);
-                                        cursor = placement;
+                                        files[n].cursor = placement;
                                         clear(&files[n].lines, top, height, start, width);
                                         break 'inner;
                                     }
