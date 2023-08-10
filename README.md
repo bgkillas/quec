@@ -33,32 +33,30 @@ requires modern terminal on windows, like windows terminal
 
 ``page up`` move 1 page up
 
-``home`` go to start of file
+``home`` to start of file
 
-``end`` go to end of file
+``end`` to end of file
 
-``y`` to copy line
+``y`` copy line
 
-``d`` to cut line
+``d`` cut line
 
-``p`` to print line
+``p`` print line
 
-``w`` to save
+``w``  save
 
-`` ` `` to go to next file
+``s`` save as
 
-``~`` to go to last file
+``o`` open file
 
-``q`` to quit
+`` ` ``  go to next file
 
-``u`` to undo
+``~`` go to last file
 
-``U`` to redo
+``q``  quit
 
-``/`` to start search mode
+``u``  undo
 
-search mode:
+``U``  redo
 
-``esc`` to quit search mode
-
-``enter`` to search through file
+``/``  search

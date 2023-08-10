@@ -3,16 +3,16 @@ mod misc;
 use crate::{
     history::{History, Point},
     misc::{
-        clear, clear_line, fix_history, fix_top, get_dimensions, get_file, help, print_line_number,
-        read_single_char, Files,
+        clear, clear_line, fix_history, fix_top, get_dimensions, get_word, help, open_file,
+        print_line_number, read_single_char, save_file, Files,
     },
 };
 use console::Term;
 use std::{
     cmp::min,
     env::{args, var},
-    fs::{create_dir, File},
-    io::{stdout, BufRead, BufReader, Read, Write},
+    fs::create_dir,
+    io::{stdout, Write},
 };
 fn main()
 {
@@ -20,11 +20,11 @@ fn main()
     let mut args = args().collect::<Vec<String>>();
     args.remove(0);
     let mut debug = false;
-    loop
+    'outer: loop
     {
         if args.is_empty()
         {
-            return;
+            break 'outer;
         }
         match args[0].as_str()
         {
@@ -43,10 +43,6 @@ fn main()
         }
         args.remove(0);
     }
-    if args.is_empty()
-    {
-        return;
-    }
     let mut stdout = stdout();
     print!("\x1B[?1049h\x1B[H\x1B[J");
     stdout.flush().unwrap();
@@ -62,65 +58,22 @@ fn main()
     let mut files: Vec<Files> = Vec::new();
     for arg in args
     {
-        let mut history_file = String::new();
-        let (mut lines, history) = if File::open(arg.clone()).is_err()
-        {
-            (
-                Vec::new(),
-                History {
-                    pos: 0,
-                    list: Vec::new(),
-                },
-            )
-        }
-        else
-        {
-            let f = BufReader::new(File::open(&arg).unwrap())
-                .lines()
-                .map(|l| {
-                    l.unwrap()
-                        .chars()
-                        .filter(|c| {
-                            !c.is_ascii()
-                                || c.is_ascii_graphic()
-                                || c == &' '
-                                || c == &'\t'
-                                || c == &'\n'
-                        })
-                        .collect::<Vec<char>>()
-                })
-                .collect::<Vec<Vec<char>>>();
-            history_file = get_file(arg.clone(), history_dir.clone());
-            (
-                f,
-                if let Ok(mut f) = File::open(history_file.clone())
-                {
-                    let mut read_bytes = Vec::new();
-                    f.read_to_end(&mut read_bytes).unwrap();
-                    History::from_bytes(&read_bytes)
-                }
-                else
-                {
-                    History {
-                        pos: 0,
-                        list: Vec::new(),
-                    }
-                },
-            )
-        };
-        if lines.is_empty()
-        {
-            lines.push(Vec::new());
-        }
+        files.push(open_file(arg, history_dir.clone()));
+    }
+    if files.is_empty()
+    {
         files.push(Files {
-            lines,
-            history,
-            save_file: arg,
-            history_file,
+            lines: vec![vec![]],
+            history: History {
+                pos: 0,
+                list: vec![],
+            },
+            save_file_path: "".to_string(),
+            history_file: "".to_string(),
             placement: 0,
             line: 0,
-            top: 0,
             start: 0,
+            top: 0,
             cursor: 0,
         });
     }
@@ -132,26 +85,27 @@ fn main()
         clear(&files[n].lines, top, height, start, width);
         let mut line = files[n].line;
         let mut placement = files[n].placement;
-        print_line_number(height, width, line, placement, top, start);
+        print_line_number(height, line, placement, top, start, String::new());
         stdout.flush().unwrap();
         let mut history = files[n].history.clone();
-        let save_file = files[n].save_file.clone();
-        let mut history_file = files[n].history_file.clone();
+        let save_file_path = files[n].save_file_path.clone();
         let mut cursor = files[n].cursor;
         let mut c;
+        let mut err = String::new();
         let mut edit = false;
         let mut search = false;
-        let mut ln: Option<(usize, usize)> = None;
+        let mut ln: (usize, usize) = (0, 0);
+        let mut orig: (usize, usize) = (0, 0);
         let mut word: Vec<char> = Vec::new();
         let mut clip = Vec::new();
-        let mut result: Vec<u8>;
         let mut time = None;
         loop
         {
             if (height, width) != get_dimensions()
             {
                 (height, width) = get_dimensions();
-                (top, start) = (fix_top(top, line, height), fix_top(start, placement, width));
+                top = fix_top(top, line, height);
+                start = fix_top(start, placement, width);
                 clear(&files[n].lines, top, height, start, width);
             }
             if history.list.len() >= 1000
@@ -296,12 +250,6 @@ fn main()
                     else if search && !word.is_empty()
                     {
                         word.pop();
-                        print!(
-                            "\x1B[G\x1B[{}B\x1B[{}C\x1B[K{}",
-                            height,
-                            width - 30,
-                            word.iter().collect::<String>()
-                        );
                     }
                 }
                 '\x01' =>
@@ -327,7 +275,7 @@ fn main()
                     cursor = placement;
                     if search
                     {
-                        ln = Some((line, placement));
+                        ln = (line, placement);
                     }
                 }
                 '\x02' =>
@@ -353,7 +301,7 @@ fn main()
                     cursor = placement;
                     if search
                     {
-                        ln = Some((line, placement));
+                        ln = (line, placement);
                     }
                 }
                 '\x03' =>
@@ -388,7 +336,7 @@ fn main()
                     cursor = placement;
                     if search
                     {
-                        ln = Some((line, placement));
+                        ln = (line, placement);
                     }
                 }
                 '\x04' =>
@@ -417,10 +365,10 @@ fn main()
                     cursor = placement;
                     if search
                     {
-                        ln = Some((line, placement));
+                        ln = (line, placement);
                     }
                 }
-                '\x1B' | 'h' if c != 'h' || !edit =>
+                '\x1B' | 'h' if c != 'h' || !edit && !search =>
                 {
                     //left
                     if placement == 0
@@ -468,10 +416,10 @@ fn main()
                     cursor = placement;
                     if search
                     {
-                        ln = Some((line, placement));
+                        ln = (line, placement);
                     }
                 }
-                '\x1C' | 'l' if c != 'l' || !edit =>
+                '\x1C' | 'l' if c != 'l' || !edit && !search =>
                 {
                     //right
                     if placement == files[n].lines[line].len()
@@ -518,10 +466,10 @@ fn main()
                     cursor = placement;
                     if search
                     {
-                        ln = Some((line, placement));
+                        ln = (line, placement);
                     }
                 }
-                '\x1D' | 'k' if c != 'k' || !edit =>
+                '\x1D' | 'k' if c != 'k' || !edit && !search =>
                 {
                     //up
                     if line == 0
@@ -582,10 +530,10 @@ fn main()
                     }
                     if search
                     {
-                        ln = Some((line, placement));
+                        ln = (line, placement);
                     }
                 }
-                '\x1E' | 'j' if c != 'j' || !edit =>
+                '\x1E' | 'j' if c != 'j' || !edit && !search =>
                 {
                     //down
                     if line + 1 == files[n].lines.len()
@@ -637,7 +585,7 @@ fn main()
                     }
                     if search
                     {
-                        ln = Some((line, placement));
+                        ln = (line, placement);
                     }
                 }
                 '\x1A' =>
@@ -653,8 +601,8 @@ fn main()
                     files[n] = Files {
                         lines: files[n].lines.clone(),
                         history,
-                        save_file,
-                        history_file,
+                        save_file_path,
+                        history_file: files[n].history_file.clone(),
                         placement,
                         line,
                         start,
@@ -672,8 +620,8 @@ fn main()
                     files[n] = Files {
                         lines: files[n].lines.clone(),
                         history,
-                        save_file,
-                        history_file,
+                        save_file_path,
+                        history_file: files[n].history_file.clone(),
                         placement,
                         line,
                         start,
@@ -685,7 +633,7 @@ fn main()
                     stdout.flush().unwrap();
                     continue 'outer;
                 }
-                '0' if !edit =>
+                '0' if !edit && !search =>
                 {
                     //start of line
                     placement = 0;
@@ -697,10 +645,10 @@ fn main()
                     }
                     if search
                     {
-                        ln = Some((line, placement));
+                        ln = (line, placement);
                     }
                 }
-                '$' if !edit =>
+                '$' if !edit && !search =>
                 {
                     //end of line
                     placement = files[n].lines[line].len();
@@ -712,8 +660,268 @@ fn main()
                     }
                     if search
                     {
-                        ln = Some((line, placement));
+                        ln = (line, placement);
                     }
+                }
+                'w' if !edit && !search =>
+                {
+                    //save
+                    err = save_file(&mut files[n], history_dir.clone());
+                    line = min(line, files[n].lines.len() - 1);
+                    placement = min(placement, files[n].lines[line].len());
+                    top = fix_top(top, line, height);
+                    start = fix_top(start, placement, width);
+                }
+                'y' if !edit && !search =>
+                {
+                    //copy line
+                    clip = files[n].lines[line].clone();
+                }
+                'd' if !edit && !search =>
+                {
+                    //cut line
+                    placement = 0;
+                    cursor = 0;
+                    start = 0;
+                    if line + 1 == files[n].lines.len()
+                    {
+                        clip = files[n].lines.pop().unwrap();
+                        files[n].lines.push(Vec::new());
+                        print!("\x1b[G\x1b[K");
+                    }
+                    else
+                    {
+                        clip = files[n].lines.remove(line);
+                        clear(&files[n].lines, top, height, start, width);
+                    }
+                    fix_history(&mut history);
+                    history.list.insert(
+                        0,
+                        Point {
+                            add: false,
+                            split: false,
+                            pos: (line, placement),
+                            char: '\0',
+                            line: Some(clip.clone()),
+                        },
+                    )
+                }
+                'p' if !edit && !search =>
+                {
+                    //paste line
+                    files[n].lines.insert(line, clip.clone());
+                    placement = 0;
+                    cursor = 0;
+                    start = 0;
+                    clear(&files[n].lines, top, height, start, width);
+                    fix_history(&mut history);
+                    history.list.insert(
+                        0,
+                        Point {
+                            add: true,
+                            split: false,
+                            pos: (line, placement),
+                            char: '\0',
+                            line: Some(clip.clone()),
+                        },
+                    )
+                }
+                '/' if !edit && !search =>
+                {
+                    //enable search
+                    search = true;
+                    orig = (line, placement);
+                    word = Vec::new()
+                }
+                'q' if !edit && !search =>
+                {
+                    //quit
+                    print!("\x1B[G\x1B[{}B\x1B[?1049l", height);
+                    stdout.flush().unwrap();
+                    return;
+                }
+                'i' if !edit && !search =>
+                {
+                    //enable edit mode
+                    edit = true;
+                }
+                'u' if !edit && !search && history.list.len() != history.pos =>
+                {
+                    //undo
+                    match (
+                        history.list[history.pos].add,
+                        history.list[history.pos].split,
+                        &history.list[history.pos].line,
+                    )
+                    {
+                        (false, false, None) =>
+                        {
+                            line = history.list[history.pos].pos.0;
+                            placement = history.list[history.pos].pos.1;
+                            if line == files[n].lines.len()
+                            {
+                                files[n].lines.push(Vec::new());
+                            }
+                            files[n].lines[line].insert(placement, history.list[history.pos].char);
+                            placement += 1;
+                        }
+                        (true, false, None) =>
+                        {
+                            line = history.list[history.pos].pos.0;
+                            placement = history.list[history.pos].pos.1 - 1;
+                            files[n].lines[line].remove(placement);
+                        }
+                        (false, true, None) =>
+                        {
+                            line = history.list[history.pos].pos.0 + 1;
+                            placement = 0;
+                            let l = files[n].lines[line - 1]
+                                .drain(history.list[history.pos].pos.1..)
+                                .collect();
+                            files[n].lines.insert(line, l);
+                        }
+                        (true, true, None) =>
+                        {
+                            line = history.list[history.pos].pos.0 - 1;
+                            placement = files[n].lines[line].len();
+                            let l = files[n].lines.remove(line + 1);
+                            files[n].lines[line].extend(l);
+                        }
+                        (false, false, Some(l)) =>
+                        {
+                            line = history.list[history.pos].pos.0;
+                            placement = 0;
+                            if line == files[n].lines.len()
+                            {
+                                files[n].lines.push(Vec::new());
+                            }
+                            files[n].lines.insert(line, l.clone());
+                        }
+                        (true, false, Some(_)) =>
+                        {
+                            line = history.list[history.pos].pos.0;
+                            placement = 0;
+                            files[n].lines.remove(line);
+                        }
+                        _ => unimplemented!(),
+                    }
+                    cursor = placement;
+                    top = fix_top(top, line, height);
+                    start = fix_top(start, placement, width);
+                    clear(&files[n].lines, top, height, start, width);
+                    history.pos += 1;
+                }
+                'U' if !edit && !search && history.pos > 0 =>
+                {
+                    //redo
+                    history.pos -= 1;
+                    match (
+                        history.list[history.pos].add,
+                        history.list[history.pos].split,
+                        &history.list[history.pos].line,
+                    )
+                    {
+                        (false, false, None) =>
+                        {
+                            line = history.list[history.pos].pos.0;
+                            placement = history.list[history.pos].pos.1;
+                            files[n].lines[line].remove(placement);
+                        }
+                        (true, false, None) =>
+                        {
+                            line = history.list[history.pos].pos.0;
+                            placement = history.list[history.pos].pos.1 - 1;
+                            files[n].lines[line].insert(placement, history.list[history.pos].char);
+                            placement += 1;
+                        }
+                        (false, true, None) =>
+                        {
+                            line = history.list[history.pos].pos.0;
+                            placement = files[n].lines[line].len();
+                            let l = files[n].lines.remove(line + 1);
+                            files[n].lines[line].extend(l);
+                        }
+                        (true, true, None) =>
+                        {
+                            line = history.list[history.pos].pos.0;
+                            placement = 0;
+                            if line == files[n].lines.len()
+                            {
+                                files[n].lines.push(Vec::new())
+                            }
+                            let l = files[n].lines[line]
+                                .drain(history.list[history.pos].pos.1..)
+                                .collect();
+                            files[n].lines.insert(line, l);
+                        }
+                        (false, false, Some(_)) =>
+                        {
+                            line = history.list[history.pos].pos.0;
+                            placement = 0;
+                            files[n].lines.remove(line);
+                        }
+                        (true, false, Some(l)) =>
+                        {
+                            line = history.list[history.pos].pos.0;
+                            placement = 0;
+                            if line == files[n].lines.len()
+                            {
+                                files[n].lines.push(Vec::new());
+                            }
+                            files[n].lines.insert(line, l.clone());
+                        }
+                        _ => unimplemented!(),
+                    }
+                    cursor = placement;
+                    top = fix_top(top, line, height);
+                    start = fix_top(start, placement, width);
+                    clear(&files[n].lines, top, height, start, width);
+                }
+                's' if !edit && !search =>
+                {
+                    match get_word(&term, &mut stdout, height)
+                    {
+                        Ok(file_path) =>
+                        {
+                            files[n].save_file_path = file_path;
+                            err = save_file(&mut files[n], history_dir.clone());
+                            line = min(line, files[n].lines.len() - 1);
+                            placement = min(placement, files[n].lines[line].len());
+                            top = fix_top(top, line, height);
+                            start = fix_top(start, placement, width);
+                        }
+                        Err(()) =>
+                        {
+                            clear(&files[n].lines, top, height, start, width);
+                        }
+                    };
+                }
+                'o' if !edit && !search =>
+                {
+                    match get_word(&term, &mut stdout, height)
+                    {
+                        Ok(file_path) =>
+                        {
+                            let j = n;
+                            for (index, file) in files.iter().enumerate()
+                            {
+                                if file.save_file_path == file_path
+                                {
+                                    n = index;
+                                }
+                            }
+                            if n == j
+                            {
+                                files.push(open_file(file_path, history_dir.clone()));
+                                n = files.len() - 1;
+                            }
+                            continue 'outer;
+                        }
+                        Err(()) =>
+                        {
+                            clear(&files[n].lines, top, height, start, width);
+                        }
+                    };
                 }
                 '\0' =>
                 {}
@@ -755,345 +963,54 @@ fn main()
                     {
                         if c != '\n'
                         {
-                            ln = None;
+                            ln = orig;
                             word.push(c);
-                            print!(
-                                "\x1B[G\x1B[{}B\x1B[{}C\x1B[K{}",
-                                height,
-                                width - 30,
-                                word.iter().collect::<String>()
-                            );
                         }
                         'inner: for (l, i) in files[n].lines.iter().enumerate()
                         {
-                            if (ln.is_some_and(|x| l >= x.0) || ln.is_none())
-                                && word.len() <= i.len()
+                            if l >= ln.0 && word.len() <= i.len()
                             {
-                                for j in if let Some(n) = ln { n.1 + 1 } else { 0 }
-                                    ..=(i.len() - word.len())
+                                for j in
+                                    if l == ln.0 { ln.1 + 1 } else { 0 }..=(i.len() - word.len())
                                 {
                                     if i[j..j + word.len()] == word
                                     {
-                                        ln = Some((l, j));
-                                        (line, placement) = ln.unwrap();
-                                        (top, start) = (
-                                            fix_top(top, line, height),
-                                            fix_top(start, placement, width),
-                                        );
+                                        ln = (l, j);
+                                        (line, placement) = ln;
+                                        top = fix_top(top, line, height);
+                                        start = fix_top(start, placement, width);
                                         cursor = placement;
                                         clear(&files[n].lines, top, height, start, width);
-                                        print!(
-                                            "\x1B[G\x1B[{}B\x1B[{}C\x1B[K{}",
-                                            height,
-                                            width - 30,
-                                            word.iter().collect::<String>()
-                                        );
                                         break 'inner;
                                     }
                                 }
-                                ln = None;
+                                ln = orig;
                             }
                         }
-                    }
-                    else if c == 'w'
-                    {
-                        //save
-                        files[n].lines = files[n]
-                            .lines
-                            .iter()
-                            .map(|line| {
-                                line.iter().collect::<String>().trim_end().chars().collect()
-                            })
-                            .collect();
-                        result = files[n]
-                            .lines
-                            .iter()
-                            .map(|line| line.iter().collect::<String>().as_bytes().to_vec())
-                            .flat_map(|mut line| {
-                                line.push(b'\n');
-                                line.into_iter()
-                            })
-                            .collect();
-                        result.pop();
-                        while let Some(last) = result.last()
-                        {
-                            if *last == b'\n'
-                            {
-                                result.pop();
-                                files[n].lines.pop();
-                            }
-                            else
-                            {
-                                break;
-                            }
-                        }
-                        result.push(b'\n');
-                        match File::create(save_file.clone())
-                        {
-                            Ok(mut n) => n.write_all(&result).unwrap(),
-                            Err(e) =>
-                            {
-                                print!("\x1B[G\x1B[{}B\x1B[{}C\x1B[K{}", height, width - 60, e)
-                            }
-                        }
-                        loop
-                        {
-                            if !history.list.is_empty()
-                                && (
-                                    history.list[0].add,
-                                    history.list[0].split,
-                                    history.list[0].line.clone(),
-                                ) == (true, true, None)
-                                && history.list[0].pos.0 >= files[n].lines.len()
-                            {
-                                history.list.remove(0);
-                            }
-                            else
-                            {
-                                break;
-                            }
-                        }
-                        if !history.list.is_empty()
-                        {
-                            if history_file.is_empty()
-                            {
-                                history_file = get_file(save_file.clone(), history_dir.clone());
-                            }
-                            File::create(history_file.clone())
-                                .unwrap()
-                                .write_all(&history.to_bytes())
-                                .unwrap();
-                        }
-                        else
-                        {
-                            let _ = std::fs::remove_file(history_file.clone());
-                        }
-                        line = min(line, files[n].lines.len() - 1);
-                        placement = min(placement, files[n].lines[line].len());
-                        (top, start) =
-                            (fix_top(top, line, height), fix_top(start, placement, width));
-                    }
-                    else if c == 'y'
-                    {
-                        //copy line
-                        clip = files[n].lines[line].clone();
-                    }
-                    else if c == 'd'
-                    {
-                        //cut line
-                        placement = 0;
-                        cursor = 0;
-                        start = 0;
-                        if line + 1 == files[n].lines.len()
-                        {
-                            clip = files[n].lines.pop().unwrap();
-                            files[n].lines.push(Vec::new());
-                            print!("\x1b[G\x1b[K");
-                        }
-                        else
-                        {
-                            clip = files[n].lines.remove(line);
-                            clear(&files[n].lines, top, height, start, width);
-                        }
-                        fix_history(&mut history);
-                        history.list.insert(
-                            0,
-                            Point {
-                                add: false,
-                                split: false,
-                                pos: (line, placement),
-                                char: '\0',
-                                line: Some(clip.clone()),
-                            },
-                        )
-                    }
-                    else if c == 'p'
-                    {
-                        //paste line
-                        files[n].lines.insert(line, clip.clone());
-                        placement = 0;
-                        cursor = 0;
-                        start = 0;
-                        clear(&files[n].lines, top, height, start, width);
-                        fix_history(&mut history);
-                        history.list.insert(
-                            0,
-                            Point {
-                                add: true,
-                                split: false,
-                                pos: (line, placement),
-                                char: '\0',
-                                line: Some(clip.clone()),
-                            },
-                        )
-                    }
-                    else if c == '/'
-                    {
-                        //enable search
-                        search = true;
-                        ln = None;
-                        word = Vec::new();
-                    }
-                    else if c == 'q'
-                    {
-                        //quit
-                        print!("\x1B[G\x1B[{}B\x1B[?1049l", height);
-                        stdout.flush().unwrap();
-                        return;
-                    }
-                    else if c == 'i'
-                    {
-                        //enable edit mode
-                        edit = true;
-                    }
-                    else if c == 'u' && history.list.len() != history.pos
-                    {
-                        //undo
-                        match (
-                            history.list[history.pos].add,
-                            history.list[history.pos].split,
-                            &history.list[history.pos].line,
-                        )
-                        {
-                            (false, false, None) =>
-                            {
-                                line = history.list[history.pos].pos.0;
-                                placement = history.list[history.pos].pos.1;
-                                if line == files[n].lines.len()
-                                {
-                                    files[n].lines.push(Vec::new());
-                                }
-                                files[n].lines[line]
-                                    .insert(placement, history.list[history.pos].char);
-                                placement += 1;
-                            }
-                            (true, false, None) =>
-                            {
-                                line = history.list[history.pos].pos.0;
-                                placement = history.list[history.pos].pos.1 - 1;
-                                files[n].lines[line].remove(placement);
-                            }
-                            (false, true, None) =>
-                            {
-                                line = history.list[history.pos].pos.0 + 1;
-                                placement = 0;
-                                let l = files[n].lines[line - 1]
-                                    .drain(history.list[history.pos].pos.1..)
-                                    .collect();
-                                files[n].lines.insert(line, l);
-                            }
-                            (true, true, None) =>
-                            {
-                                line = history.list[history.pos].pos.0 - 1;
-                                placement = files[n].lines[line].len();
-                                let l = files[n].lines.remove(line + 1);
-                                files[n].lines[line].extend(l);
-                            }
-                            (false, false, Some(l)) =>
-                            {
-                                line = history.list[history.pos].pos.0;
-                                placement = 0;
-                                if line == files[n].lines.len()
-                                {
-                                    files[n].lines.push(Vec::new());
-                                }
-                                files[n].lines.insert(line, l.clone());
-                            }
-                            (true, false, Some(_)) =>
-                            {
-                                line = history.list[history.pos].pos.0;
-                                placement = 0;
-                                files[n].lines.remove(line);
-                            }
-                            _ => unimplemented!(),
-                        }
-                        cursor = placement;
-                        (top, start) =
-                            (fix_top(top, line, height), fix_top(start, placement, width));
-                        clear(&files[n].lines, top, height, start, width);
-                        history.pos += 1;
-                    }
-                    else if c == 'U' && history.pos > 0
-                    {
-                        //redo
-                        history.pos -= 1;
-                        match (
-                            history.list[history.pos].add,
-                            history.list[history.pos].split,
-                            &history.list[history.pos].line,
-                        )
-                        {
-                            (false, false, None) =>
-                            {
-                                line = history.list[history.pos].pos.0;
-                                placement = history.list[history.pos].pos.1;
-                                files[n].lines[line].remove(placement);
-                            }
-                            (true, false, None) =>
-                            {
-                                line = history.list[history.pos].pos.0;
-                                placement = history.list[history.pos].pos.1 - 1;
-                                files[n].lines[line]
-                                    .insert(placement, history.list[history.pos].char);
-                                placement += 1;
-                            }
-                            (false, true, None) =>
-                            {
-                                line = history.list[history.pos].pos.0;
-                                placement = files[n].lines[line].len();
-                                let l = files[n].lines.remove(line + 1);
-                                files[n].lines[line].extend(l);
-                            }
-                            (true, true, None) =>
-                            {
-                                line = history.list[history.pos].pos.0;
-                                placement = 0;
-                                if line == files[n].lines.len()
-                                {
-                                    files[n].lines.push(Vec::new())
-                                }
-                                let l = files[n].lines[line]
-                                    .drain(history.list[history.pos].pos.1..)
-                                    .collect();
-                                files[n].lines.insert(line, l);
-                            }
-                            (false, false, Some(_)) =>
-                            {
-                                line = history.list[history.pos].pos.0;
-                                placement = 0;
-                                files[n].lines.remove(line);
-                            }
-                            (true, false, Some(l)) =>
-                            {
-                                line = history.list[history.pos].pos.0;
-                                placement = 0;
-                                if line == files[n].lines.len()
-                                {
-                                    files[n].lines.push(Vec::new());
-                                }
-                                files[n].lines.insert(line, l.clone());
-                            }
-                            _ => unimplemented!(),
-                        }
-                        cursor = placement;
-                        (top, start) =
-                            (fix_top(top, line, height), fix_top(start, placement, width));
-                        clear(&files[n].lines, top, height, start, width);
                     }
                 }
                 _ =>
                 {}
             }
-            if debug
-            {
-                print!(
-                    "\x1B[G\x1B[{}B\x1B[{}C\x1B[K{}",
-                    height,
-                    width - 30,
-                    time.unwrap().elapsed().as_nanos()
-                );
-            }
-            print_line_number(height, width, line, placement, top, start);
+            print_line_number(
+                height,
+                line,
+                placement,
+                top,
+                start,
+                if search
+                {
+                    word.iter().collect()
+                }
+                else if debug
+                {
+                    time.unwrap().elapsed().as_nanos().to_string()
+                }
+                else
+                {
+                    err.clone()
+                },
+            );
             stdout.flush().unwrap();
         }
     }
