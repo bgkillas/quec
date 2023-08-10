@@ -125,7 +125,7 @@ pub fn clear_line(lines: &[Vec<char>], line: usize, placement: usize, width: usi
 pub fn clear(lines: &[Vec<char>], top: usize, height: usize, start: usize, width: usize)
 {
     print!(
-        "\x1B[H\x1B[J{}",
+        "\x1B[?25l\x1B[H{}\x1B[?25h",
         lines[top..min(lines.len(), height + top)]
             .iter()
             .map(|vec| {
@@ -134,10 +134,11 @@ pub fn clear(lines: &[Vec<char>], top: usize, height: usize, start: usize, width
                     vec[start..min(vec.len(), width + start)]
                         .iter()
                         .collect::<String>()
+                        + "\x1B[K"
                 }
                 else
                 {
-                    "".to_string()
+                    "\x1B[K".to_string()
                 }
             })
             .collect::<Vec<String>>()
