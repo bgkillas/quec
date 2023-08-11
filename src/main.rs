@@ -908,6 +908,8 @@ fn main()
                                 files.push(open_file(file_path, history_dir.clone()));
                                 n = files.len() - 1;
                             }
+                            print!("\x1B[H\x1B[J");
+                            stdout.flush().unwrap();
                             continue 'outer;
                         }
                         Err(()) =>
