@@ -105,7 +105,7 @@ pub fn get_dimensions() -> (usize, usize)
 {
     if let Some((width, height)) = dimensions()
     {
-        (height, width)
+        (height - 1, width)
     }
     else
     {
