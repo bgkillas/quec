@@ -679,6 +679,10 @@ fn main()
                     else
                     {
                         clip = files[n].lines.remove(line);
+                        if top + height > files[n].lines.len()
+                        {
+                            print!("\x1b[G\x1b[J");
+                        }
                         clear(&files[n].lines, top, height, start, width);
                     }
                     fix_history(&mut files[n].history);
