@@ -78,7 +78,7 @@ pub fn read_single_char(term: &Term) -> char
         Key::Char(c) => c,
         Key::Enter => '\n',
         Key::Backspace => '\x08',
-        Key::ArrowLeft => '\x1B',
+        Key::ArrowLeft => '\x1b',
         Key::Home => '\x01',
         Key::End => '\x02',
         Key::PageUp => '\x03',
@@ -115,7 +115,7 @@ pub fn get_dimensions() -> (usize, usize)
 pub fn clear_line(lines: &[Vec<char>], line: usize, placement: usize, width: usize, start: usize)
 {
     print!(
-        "\x1B[K{}",
+        "\x1b[K{}",
         lines[line][placement..min(lines[line].len(), width + start)]
             .iter()
             .collect::<String>()
@@ -125,7 +125,7 @@ pub fn clear_line(lines: &[Vec<char>], line: usize, placement: usize, width: usi
 pub fn clear(lines: &[Vec<char>], top: usize, height: usize, start: usize, width: usize)
 {
     print!(
-        "\x1B[?25l\x1B[H{}\x1B[?25h",
+        "\x1b[?25l\x1b[H{}\x1b[?25h",
         lines[top..min(lines.len(), height + top)]
             .iter()
             .map(|vec| {
@@ -134,11 +134,11 @@ pub fn clear(lines: &[Vec<char>], top: usize, height: usize, start: usize, width
                     vec[start..min(vec.len(), width + start)]
                         .iter()
                         .collect::<String>()
-                        + "\x1B[K"
+                        + "\x1b[K"
                 }
                 else
                 {
-                    "\x1B[K".to_string()
+                    "\x1b[K".to_string()
                 }
             })
             .collect::<Vec<String>>()
@@ -158,7 +158,7 @@ pub fn print_line_number(
     let n = format!("{},{}", line + 1, placement + 1);
     let i = 10 * (n.len().ilog10() + 1) as usize - n.len();
     print!(
-        "\x1B[H\x1B[{}B\x1B[K{} \x1B[{}C{}\x1B[H{}{}",
+        "\x1b[H\x1b[{}B\x1b[K{} \x1b[{}C{}\x1b[H{}{}",
         height + 1,
         n,
         i,
@@ -169,7 +169,7 @@ pub fn print_line_number(
         }
         else
         {
-            "\x1B[".to_owned() + &(line - top).to_string() + "B"
+            "\x1b[".to_owned() + &(line - top).to_string() + "B"
         },
         if placement - start == 0
         {
@@ -177,7 +177,7 @@ pub fn print_line_number(
         }
         else
         {
-            "\x1B[".to_owned() + &(placement - start).to_string() + "C"
+            "\x1b[".to_owned() + &(placement - start).to_string() + "C"
         }
     );
 }

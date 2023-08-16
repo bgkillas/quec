@@ -46,7 +46,7 @@ fn main()
         args.remove(0);
     }
     let mut stdout = stdout();
-    print!("\x1B[?1049h\x1B[H\x1B[J");
+    print!("\x1b[?1049h\x1b[H\x1b[J");
     stdout.flush().unwrap();
     #[cfg(unix)]
     let history_dir = var("HOME").unwrap() + "/.quec/";
@@ -193,7 +193,7 @@ fn main()
                             files[n].lines[line].extend(t);
                             start = fix_top(start, placement, width);
                             clear(&files[n].lines, top, height, start, width);
-                            print!("\n\x1B[K");
+                            print!("\n\x1b[K");
                             fix_history(&mut files[n].history);
                             files[n].history.list.insert(
                                 0,
@@ -230,7 +230,7 @@ fn main()
                                 }
                                 else
                                 {
-                                    print!("\x08\x1B[K");
+                                    print!("\x08\x1b[K");
                                 }
                             }
                             else if placement + 1 == start
@@ -367,7 +367,7 @@ fn main()
                         ln = (line, placement);
                     }
                 }
-                '\x1B' | 'h' if c != 'h' || !edit && !search =>
+                '\x1b' | 'h' if c != 'h' || !edit && !search =>
                 {
                     //left
                     if placement == 0
@@ -604,7 +604,7 @@ fn main()
                     files[n].start = start;
                     files[n].top = top;
                     n += 1;
-                    print!("\x1B[H\x1B[J");
+                    print!("\x1b[H\x1b[J");
                     stdout.flush().unwrap();
                     continue 'outer;
                 }
@@ -616,7 +616,7 @@ fn main()
                     files[n].start = start;
                     files[n].top = top;
                     n -= 1;
-                    print!("\x1B[H\x1B[J");
+                    print!("\x1b[H\x1b[J");
                     stdout.flush().unwrap();
                     continue 'outer;
                 }
@@ -727,7 +727,7 @@ fn main()
                 'q' if !edit && !search =>
                 {
                     //quit
-                    print!("\x1B[G\x1B[{}B\x1B[?1049l", height);
+                    print!("\x1b[G\x1b[{}B\x1b[?1049l", height);
                     stdout.flush().unwrap();
                     return;
                 }
@@ -912,7 +912,7 @@ fn main()
                                 files.push(open_file(file_path, history_dir.clone()));
                                 n = files.len() - 1;
                             }
-                            print!("\x1B[H\x1B[J");
+                            print!("\x1b[H\x1b[J");
                             stdout.flush().unwrap();
                             continue 'outer;
                         }

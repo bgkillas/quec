@@ -110,8 +110,9 @@ pub fn open_file(file: String, history_dir: String) -> Files
     {
         let f = BufReader::new(File::open(&file).unwrap())
             .lines()
-            .map(|l| {
-                l.unwrap()
+            .map(|l| match l
+            {
+                Ok(l) => l
                     .chars()
                     .filter(|c| {
                         !c.is_ascii()
@@ -120,7 +121,12 @@ pub fn open_file(file: String, history_dir: String) -> Files
                             || c == &'\t'
                             || c == &'\n'
                     })
-                    .collect::<Vec<char>>()
+                    .collect::<Vec<char>>(),
+                Err(e) =>
+                {
+                    println!("\x1b[?1049l{}", e);
+                    std::process::exit(1);
+                }
             })
             .collect::<Vec<Vec<char>>>();
         history_file = get_file(file.clone(), history_dir.clone());
@@ -171,7 +177,7 @@ pub fn get_word(term: &Term, stdout: &mut Stdout, height: usize) -> Result<Strin
                 //right
                 index += 1;
             }
-            '\x1B' if index != 0 =>
+            '\x1b' if index != 0 =>
             {
                 //left
                 index -= 1;
@@ -197,7 +203,7 @@ pub fn get_word(term: &Term, stdout: &mut Stdout, height: usize) -> Result<Strin
             {}
         }
         print!(
-            "\x1B[H\x1B[{}B\x1B[K{}\x1B[G{}",
+            "\x1b[H\x1b[{}B\x1b[K{}\x1b[G{}",
             height + 1,
             file_path.iter().collect::<String>(),
             if index == 0
@@ -206,7 +212,7 @@ pub fn get_word(term: &Term, stdout: &mut Stdout, height: usize) -> Result<Strin
             }
             else
             {
-                "\x1B[".to_owned() + &index.to_string() + "C"
+                "\x1b[".to_owned() + &index.to_string() + "C"
             },
         );
         stdout.flush().unwrap();
