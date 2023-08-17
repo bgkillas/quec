@@ -17,7 +17,8 @@ use std::{
     io::{stdout, Write},
 };
 //support ctrl+backspace and alt+movement
-//consider using vec<vec<u8>> instead of vec<char> to allow longer tab and bin files
+//digraph support
+//use Vec<String> instead of Vec<Vec<char>>
 fn main()
 {
     let mut args = args().collect::<Vec<String>>();
@@ -962,6 +963,13 @@ fn main()
                     {
                         if c != '\n'
                         {
+                            if start + width == placement + word.len() + 1
+                                && files[n].lines[ln.0][ln.1 + word.len()] == c
+                            {
+                                start += 1;
+                                clear(&files[n].lines, top, height, start, width);
+                                stdout.flush().unwrap();
+                            }
                             ln = orig;
                             word.push(c);
                         }
@@ -978,6 +986,10 @@ fn main()
                                         (line, placement) = ln;
                                         top = fix_top(top, line, height);
                                         start = fix_top(start, placement, width);
+                                        if start + width == placement + 1
+                                        {
+                                            start += word.len()
+                                        }
                                         files[n].cursor = placement;
                                         clear(&files[n].lines, top, height, start, width);
                                         break 'inner;
