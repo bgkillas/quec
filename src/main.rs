@@ -9,16 +9,17 @@ use crate::{
         read_single_char,
     },
 };
-use console::Term;
+use crossterm::terminal;
 use std::{
     cmp::min,
     env::{args, var},
     fs::create_dir,
     io::{stdout, Write},
 };
+//support ctrl+backspace and alt+movement
+//consider using vec<vec<u8>> instead of vec<char> to allow longer tab and bin files
 fn main()
 {
-    let term = Term::stdout();
     let mut args = args().collect::<Vec<String>>();
     args.remove(0);
     let mut debug = false;
@@ -33,12 +34,12 @@ fn main()
             "--help" | "-h" =>
             {
                 help();
-                return;
+                std::process::exit(0);
             }
             "--version" | "-v" =>
             {
                 println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
-                return;
+                std::process::exit(0);
             }
             "--debug" => debug = true,
             _ => break,
@@ -47,7 +48,6 @@ fn main()
     }
     let mut stdout = stdout();
     print!("\x1b[?1049h\x1b[H\x1b[J");
-    stdout.flush().unwrap();
     #[cfg(unix)]
     let history_dir = var("HOME").unwrap() + "/.quec/";
     #[cfg(not(unix))]
@@ -80,6 +80,8 @@ fn main()
         });
     }
     let mut n = 0;
+    let mut clip = Vec::new();
+    terminal::enable_raw_mode().unwrap();
     'outer: loop
     {
         let mut top = files[n].top;
@@ -95,7 +97,6 @@ fn main()
         let mut ln: (usize, usize) = (0, 0);
         let mut orig: (usize, usize) = (0, 0);
         let mut word: Vec<char> = Vec::new();
-        let mut clip = Vec::new();
         let mut time = None;
         loop
         {
@@ -114,7 +115,7 @@ fn main()
             {
                 files[n].history.list.clear();
             }
-            let c = read_single_char(&term);
+            let c = read_single_char();
             if debug
             {
                 time = Some(std::time::Instant::now());
@@ -127,7 +128,7 @@ fn main()
                     if edit
                     {
                         line += 1;
-                        if line == files[n].lines.len() && placement == 0
+                        if line + 1 == files[n].lines.len() && placement == 0
                         {
                             files[n].lines.push(Vec::new());
                             placement = 0;
@@ -193,7 +194,7 @@ fn main()
                             files[n].lines[line].extend(t);
                             start = fix_top(start, placement, width);
                             clear(&files[n].lines, top, height, start, width);
-                            print!("\n\x1b[K");
+                            print!("\x1b[E\x1b[G\x1b[K");
                             fix_history(&mut files[n].history);
                             files[n].history.list.insert(
                                 0,
@@ -367,7 +368,7 @@ fn main()
                         ln = (line, placement);
                     }
                 }
-                '\x1b' | 'h' if c != 'h' || !edit && !search =>
+                '\x1B' | 'h' if c != 'h' || !edit && !search =>
                 {
                     //left
                     if placement == 0
@@ -542,9 +543,10 @@ fn main()
                         {
                             placement = files[n].lines[line].len();
                             files[n].cursor = placement;
-                            if line == height + top
+                            let s = start;
+                            start = fix_top(start, placement, width);
+                            if s != start
                             {
-                                top += 1;
                                 clear(&files[n].lines, top, height, start, width);
                             }
                         }
@@ -605,7 +607,6 @@ fn main()
                     files[n].top = top;
                     n += 1;
                     print!("\x1b[H\x1b[J");
-                    stdout.flush().unwrap();
                     continue 'outer;
                 }
                 '~' if !edit && !search && n != 0 =>
@@ -617,7 +618,6 @@ fn main()
                     files[n].top = top;
                     n -= 1;
                     print!("\x1b[H\x1b[J");
-                    stdout.flush().unwrap();
                     continue 'outer;
                 }
                 '0' if !edit && !search =>
@@ -729,7 +729,8 @@ fn main()
                     //quit
                     print!("\x1b[G\x1b[{}B\x1b[?1049l", height);
                     stdout.flush().unwrap();
-                    return;
+                    terminal::disable_raw_mode().unwrap();
+                    std::process::exit(0);
                 }
                 'i' if !edit && !search =>
                 {
@@ -876,7 +877,7 @@ fn main()
                 }
                 's' if !edit && !search =>
                 {
-                    match get_word(&term, &mut stdout, height)
+                    match get_word(&mut stdout, height)
                     {
                         Ok(file_path) =>
                         {
@@ -895,7 +896,7 @@ fn main()
                 }
                 'o' if !edit && !search =>
                 {
-                    match get_word(&term, &mut stdout, height)
+                    match get_word(&mut stdout, height)
                     {
                         Ok(file_path) =>
                         {
@@ -913,7 +914,6 @@ fn main()
                                 n = files.len() - 1;
                             }
                             print!("\x1b[H\x1b[J");
-                            stdout.flush().unwrap();
                             continue 'outer;
                         }
                         Err(()) =>

@@ -2,7 +2,7 @@ use crate::{
     history::History,
     misc::{get_file, read_single_char},
 };
-use console::Term;
+use crossterm::terminal;
 use std::{
     fs::File,
     io::{BufRead, BufReader, Read, Stdout, Write},
@@ -125,6 +125,7 @@ pub fn open_file(file: String, history_dir: String) -> Files
                 Err(e) =>
                 {
                     println!("\x1b[?1049l{}", e);
+                    terminal::disable_raw_mode().unwrap();
                     std::process::exit(1);
                 }
             })
@@ -163,13 +164,13 @@ pub fn open_file(file: String, history_dir: String) -> Files
         cursor: 0,
     }
 }
-pub fn get_word(term: &Term, stdout: &mut Stdout, height: usize) -> Result<String, ()>
+pub fn get_word(stdout: &mut Stdout, height: usize) -> Result<String, ()>
 {
     let mut index = 0;
     let mut file_path = Vec::new();
     loop
     {
-        let c = read_single_char(term);
+        let c = read_single_char();
         match c
         {
             '\x1C' if index != file_path.len() =>
@@ -177,7 +178,7 @@ pub fn get_word(term: &Term, stdout: &mut Stdout, height: usize) -> Result<Strin
                 //right
                 index += 1;
             }
-            '\x1b' if index != 0 =>
+            '\x1B' if index != 0 =>
             {
                 //left
                 index -= 1;

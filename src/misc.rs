@@ -1,8 +1,12 @@
 use crate::history::History;
-use console::{Key, Term};
+use crossterm::{
+    event::{read, Event, KeyCode, KeyEvent, KeyModifiers},
+    terminal,
+};
 use std::{
     cmp::{min, Ordering},
     fs::canonicalize,
+    io::{stdout, Write},
 };
 #[cfg(not(unix))]
 use term_size::dimensions;
@@ -71,25 +75,46 @@ pub fn fix_top(top: usize, line: usize, height: usize) -> usize
         Ordering::Equal => top,
     }
 }
-pub fn read_single_char(term: &Term) -> char
+pub fn read_single_char() -> char
 {
-    match term.read_key().unwrap()
+    let result = match match read()
     {
-        Key::Char(c) => c,
-        Key::Enter => '\n',
-        Key::Backspace => '\x08',
-        Key::ArrowLeft => '\x1b',
-        Key::Home => '\x01',
-        Key::End => '\x02',
-        Key::PageUp => '\x03',
-        Key::PageDown => '\x04',
-        Key::ArrowRight => '\x1C',
-        Key::ArrowUp => '\x1D',
-        Key::ArrowDown => '\x1E',
-        Key::Escape => '\x1A',
-        Key::Tab => '\t',
-        _ => '\0',
+        Ok(c) => c,
+        Err(_) => return '\0',
     }
+    {
+        Event::Key(KeyEvent {
+            code, modifiers, ..
+        }) => match (code, modifiers)
+        {
+            (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => c,
+            (KeyCode::Char('c'), KeyModifiers::CONTROL) => '\x14',
+            (KeyCode::Esc, KeyModifiers::NONE) => '\x1A',
+            (KeyCode::Enter, KeyModifiers::NONE) => '\n',
+            (KeyCode::Backspace, KeyModifiers::NONE) => '\x08',
+            (KeyCode::Left, KeyModifiers::NONE) => '\x1B',
+            (KeyCode::Right, KeyModifiers::NONE) => '\x1C',
+            (KeyCode::Left, KeyModifiers::ALT) => '\x12',
+            (KeyCode::Right, KeyModifiers::ALT) => '\x13',
+            (KeyCode::Up, KeyModifiers::NONE) => '\x1D',
+            (KeyCode::Down, KeyModifiers::NONE) => '\x1E',
+            (KeyCode::PageDown, KeyModifiers::NONE) => '\x04',
+            (KeyCode::PageUp, KeyModifiers::NONE) => '\x03',
+            (KeyCode::End, KeyModifiers::NONE) => '\x02',
+            (KeyCode::Home, KeyModifiers::NONE) => '\x01',
+            (KeyCode::Tab, KeyModifiers::NONE) => '\t',
+            _ => '\0',
+        },
+        _ => '\0',
+    };
+    if result == '\x14'
+    {
+        print!("\x1b[G\x1b[{}B\x1b[?1049l", get_dimensions().0);
+        stdout().flush().unwrap();
+        terminal::disable_raw_mode().unwrap();
+        std::process::exit(130);
+    }
+    result
 }
 #[cfg(unix)]
 pub fn get_dimensions() -> (usize, usize)
@@ -142,7 +167,7 @@ pub fn clear(lines: &[Vec<char>], top: usize, height: usize, start: usize, width
                 }
             })
             .collect::<Vec<String>>()
-            .join("\n")
+            .join("\x1b[E\x1b[G")
             .replace('\t', " ")
     );
 }
