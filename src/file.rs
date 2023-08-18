@@ -19,7 +19,7 @@ pub struct Files
     pub top: usize,
     pub cursor: usize,
 }
-pub fn save_file(files: &mut Files, history_dir: String) -> String
+pub fn save_file(files: &mut Files, history_dir: &str) -> String
 {
     files.lines = files
         .lines
@@ -76,8 +76,7 @@ pub fn save_file(files: &mut Files, history_dir: String) -> String
             {
                 if files.history_file.is_empty()
                 {
-                    files.history_file =
-                        get_file(files.save_file_path.clone(), history_dir.clone());
+                    files.history_file = get_file(&files.save_file_path, history_dir);
                 }
                 File::create(files.history_file.clone())
                     .unwrap()
@@ -93,10 +92,10 @@ pub fn save_file(files: &mut Files, history_dir: String) -> String
     }
     err
 }
-pub fn open_file(file: String, history_dir: String) -> Files
+pub fn open_file(save_file_path: &str, history_dir: &str) -> Files
 {
     let mut history_file = String::new();
-    let (mut lines, history) = if File::open(file.clone()).is_err()
+    let (mut lines, history) = if File::open(save_file_path).is_err()
     {
         (
             Vec::new(),
@@ -108,7 +107,7 @@ pub fn open_file(file: String, history_dir: String) -> Files
     }
     else
     {
-        let f = BufReader::new(File::open(&file).unwrap())
+        let f = BufReader::new(File::open(save_file_path).unwrap())
             .lines()
             .map(|l| match l
             {
@@ -130,7 +129,7 @@ pub fn open_file(file: String, history_dir: String) -> Files
                 }
             })
             .collect::<Vec<Vec<char>>>();
-        history_file = get_file(file.clone(), history_dir.clone());
+        history_file = get_file(save_file_path, history_dir);
         (
             f,
             if let Ok(mut f) = File::open(history_file.clone())
@@ -155,8 +154,8 @@ pub fn open_file(file: String, history_dir: String) -> Files
     Files {
         lines,
         history,
-        save_file_path: file,
         history_file,
+        save_file_path: save_file_path.to_string(),
         placement: 0,
         line: 0,
         top: 0,

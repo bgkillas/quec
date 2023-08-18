@@ -209,9 +209,9 @@ pub fn print_line_number(
     );
 }
 #[cfg(unix)]
-pub fn get_file(path: String, history_dir: String) -> String
+pub fn get_file(path: &str, history_dir: &str) -> String
 {
-    history_dir.clone()
+    history_dir.to_owned()
         + &canonicalize(path)
             .unwrap()
             .to_str()
@@ -219,12 +219,12 @@ pub fn get_file(path: String, history_dir: String) -> String
             .replace('/', "%")
 }
 #[cfg(not(unix))]
-pub fn get_file(path: String, history_dir: String) -> String
+pub fn get_file(path: &str, history_dir: &str) -> String
 {
     let history_file = canonicalize(path)
         .unwrap()
         .to_str()
         .unwrap()
         .replace('\\', "%");
-    history_dir.clone() + &history_file[history_file.find(':').unwrap() + 1..]
+    history_dir.to_owned() + &history_file[history_file.find(':').unwrap() + 1..]
 }

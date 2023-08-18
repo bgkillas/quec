@@ -16,10 +16,11 @@ lto = true
 strip = true
 
 [dependencies]
-crossterm      = {version="0.27.0", default-features=false,features = ["event-stream"]}
 
 [target.'cfg(not(unix))'.dependencies]
 term_size    = "0.3.2"
+crossterm      = {version="0.27.0", default-features=false,features = ["event-stream","windows"]}
 
 [target.'cfg(unix)'.dependencies]
 libc         = "0.2.147"
+crossterm      = {version="0.27.0", default-features=false,features = ["event-stream"]}

@@ -18,15 +18,9 @@ use std::{
 };
 fn main()
 {
-    let mut args = args().collect::<Vec<String>>();
-    args.remove(0);
-    let mut debug = false;
-    loop
+    let args = &args().collect::<Vec<String>>()[1..];
+    if !args.is_empty()
     {
-        if args.is_empty()
-        {
-            break;
-        }
         match args[0].as_str()
         {
             "--help" | "-h" =>
@@ -39,10 +33,9 @@ fn main()
                 println!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"));
                 std::process::exit(0);
             }
-            "--debug" => debug = true,
-            _ => break,
+            _ =>
+            {}
         }
-        args.remove(0);
     }
     let mut stdout = stdout();
     print!("\x1b[?1049h\x1b[H\x1b[J");
@@ -55,27 +48,31 @@ fn main()
     );
     let _ = create_dir(history_dir.clone());
     let (mut height, mut width) = get_dimensions();
-    let mut files: Vec<Files> = Vec::new();
-    for arg in args
+    let mut files: Vec<Files>;
+    if args.is_empty()
     {
-        files.push(open_file(arg, history_dir.clone()));
-    }
-    if files.is_empty()
-    {
-        files.push(Files {
-            lines: vec![vec![]],
+        files = vec![Files {
+            lines: vec![Vec::new()],
             history: History {
                 pos: 0,
-                list: vec![],
+                list: Vec::new(),
             },
-            save_file_path: "".to_string(),
-            history_file: "".to_string(),
+            save_file_path: String::new(),
+            history_file: String::new(),
             placement: 0,
             line: 0,
             start: 0,
             top: 0,
             cursor: 0,
-        });
+        }]
+    }
+    else
+    {
+        files = Vec::with_capacity(args.len());
+        for arg in args
+        {
+            files.push(open_file(arg, &history_dir));
+        }
     }
     let mut n = 0;
     let mut clip = Vec::new();
@@ -86,18 +83,23 @@ fn main()
         let mut start = files[n].start;
         let mut line = files[n].line;
         let mut placement = files[n].placement;
-        let mut err = files[n].save_file_path.clone();
         clear(&files[n].lines, top, height, start, width);
-        print_line_number(height, line, placement, top, start, err.clone());
+        print_line_number(
+            height,
+            line,
+            placement,
+            top,
+            start,
+            files[n].save_file_path.clone(),
+        );
         stdout.flush().unwrap();
-        err.clear();
+        let mut err = String::new();
         let mut edit = false;
         let mut search = false;
         let mut digraph = false;
         let mut ln: (usize, usize) = (0, 0);
         let mut orig: (usize, usize) = (0, 0);
         let mut word: Vec<char> = Vec::new();
-        let mut time = None;
         loop
         {
             if (height, width) != get_dimensions()
@@ -116,10 +118,6 @@ fn main()
                 files[n].history.list.clear();
             }
             let c = read_single_char();
-            if debug
-            {
-                time = Some(std::time::Instant::now());
-            }
             match c
             {
                 '\n' if !search =>
@@ -734,7 +732,7 @@ fn main()
                 'w' if !edit && !search && !digraph =>
                 {
                     //save
-                    err = save_file(&mut files[n], history_dir.clone());
+                    err = save_file(&mut files[n], &history_dir);
                     line = min(line, files[n].lines.len() - 1);
                     placement = min(placement, files[n].lines[line].len());
                     top = fix_top(top, line, height);
@@ -984,7 +982,7 @@ fn main()
                     if let Ok(file_path) = get_word(&mut stdout, height)
                     {
                         files[n].save_file_path = file_path;
-                        err = save_file(&mut files[n], history_dir.clone());
+                        err = save_file(&mut files[n], &history_dir);
                     };
                 }
                 'o' if !edit && !search && !digraph =>
@@ -1001,7 +999,7 @@ fn main()
                         }
                         if n == j
                         {
-                            files.push(open_file(file_path, history_dir.clone()));
+                            files.push(open_file(&file_path, &history_dir));
                             n = files.len() - 1;
                         }
                         print!("\x1b[H\x1b[J");
@@ -1124,7 +1122,7 @@ fn main()
                             if l >= ln.0 && word.len() <= i.len()
                             {
                                 for j in
-                                    if l == ln.0 { ln.1 + 1 } else { 0 }..=(i.len() - word.len())
+                                    if l == ln.0 { ln.1 + 1 } else { 0 }..(i.len() - word.len() + 1)
                                 {
                                     if i[j..j + word.len()] == word
                                     {
@@ -1141,7 +1139,7 @@ fn main()
                                         break 'inner;
                                     }
                                 }
-                                ln = orig;
+                                ln = (0, 0);
                             }
                         }
                     }
@@ -1158,10 +1156,6 @@ fn main()
                 if search
                 {
                     word.iter().collect()
-                }
-                else if debug
-                {
-                    time.unwrap().elapsed().as_nanos().to_string()
                 }
                 else
                 {
