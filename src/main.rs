@@ -126,12 +126,17 @@ fn main()
                     if edit
                     {
                         line += 1;
-                        let mut ln = files[n].lines[line - 1][placement..].to_vec();
+                        let mut ln: Vec<char> = files[n].lines[line - 1][..placement]
+                            .iter()
+                            .take_while(|&&c| c == ' ')
+                            .cloned()
+                            .collect();
+                        let count = ln.len();
+                        ln.extend::<Vec<char>>(
+                            files[n].lines[line - 1].drain(placement..).collect(),
+                        );
                         files[n].lines.insert(line, ln);
-                        ln = files[n].lines[line - 1][..placement].to_vec();
-                        files[n].lines.insert(line, ln);
-                        files[n].lines.remove(line - 1);
-                        placement = 0;
+                        placement = count;
                         files[n].cursor = placement;
                         start = 0;
                         if line == height + top
