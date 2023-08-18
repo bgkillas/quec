@@ -16,7 +16,6 @@ use std::{
     fs::create_dir,
     io::{stdout, Write},
 };
-//digraph support
 //use Vec<String> instead of Vec<Vec<char>>
 fn main()
 {
@@ -88,12 +87,14 @@ fn main()
         let mut start = files[n].start;
         let mut line = files[n].line;
         let mut placement = files[n].placement;
+        let mut err = files[n].save_file_path.clone();
         clear(&files[n].lines, top, height, start, width);
-        print_line_number(height, line, placement, top, start, String::new());
+        print_line_number(height, line, placement, top, start, err.clone());
         stdout.flush().unwrap();
-        let mut err = String::new();
+        err.clear();
         let mut edit = false;
         let mut search = false;
+        let mut digraph = false;
         let mut ln: (usize, usize) = (0, 0);
         let mut orig: (usize, usize) = (0, 0);
         let mut word: Vec<char> = Vec::new();
@@ -472,7 +473,7 @@ fn main()
                         clear(&files[n].lines, top, height, start, width);
                     }
                 }
-                '\x1B' | 'h' if c != 'h' || !edit && !search =>
+                '\x1B' | 'h' if c != 'h' || !edit && !search && !digraph =>
                 {
                     //left
                     if placement == 0
@@ -523,7 +524,7 @@ fn main()
                         ln = (line, placement);
                     }
                 }
-                '\x1C' | 'l' if c != 'l' || !edit && !search =>
+                '\x1C' | 'l' if c != 'l' || !edit && !search && !digraph =>
                 {
                     //right
                     if placement == files[n].lines[line].len()
@@ -573,7 +574,7 @@ fn main()
                         ln = (line, placement);
                     }
                 }
-                '\x1D' | 'k' if c != 'k' || !edit && !search =>
+                '\x1D' | 'k' if c != 'k' || !edit && !search && !digraph =>
                 {
                     //up
                     if line == 0
@@ -638,7 +639,7 @@ fn main()
                         ln = (line, placement);
                     }
                 }
-                '\x1E' | 'j' if c != 'j' || !edit && !search =>
+                '\x1E' | 'j' if c != 'j' || !edit && !search && !digraph =>
                 {
                     //down
                     if line + 1 == files[n].lines.len()
@@ -700,9 +701,10 @@ fn main()
                     //esc
                     edit = false;
                     search = false;
-                    clear(&files[n].lines, top, height, start, width);
+                    digraph = false;
+                    //clear(&files[n].lines, top, height, start, width);
                 }
-                '`' if !edit && !search && n + 1 != files.len() =>
+                '`' if !edit && !search && !digraph && n + 1 != files.len() =>
                 {
                     //next file
                     files[n].placement = placement;
@@ -713,7 +715,7 @@ fn main()
                     print!("\x1b[H\x1b[J");
                     continue 'outer;
                 }
-                '~' if !edit && !search && n != 0 =>
+                '~' if !edit && !search && !digraph && n != 0 =>
                 {
                     //last file
                     files[n].placement = placement;
@@ -724,7 +726,7 @@ fn main()
                     print!("\x1b[H\x1b[J");
                     continue 'outer;
                 }
-                '0' if !edit && !search =>
+                '0' if !edit && !search && !digraph =>
                 {
                     //start of line
                     placement = 0;
@@ -739,7 +741,7 @@ fn main()
                         ln = (line, placement);
                     }
                 }
-                '$' if !edit && !search =>
+                '$' if !edit && !search && !digraph =>
                 {
                     //end of line
                     placement = files[n].lines[line].len();
@@ -754,7 +756,7 @@ fn main()
                         ln = (line, placement);
                     }
                 }
-                'w' if !edit && !search =>
+                'w' if !edit && !search && !digraph =>
                 {
                     //save
                     err = save_file(&mut files[n], history_dir.clone());
@@ -763,12 +765,12 @@ fn main()
                     top = fix_top(top, line, height);
                     start = fix_top(start, placement, width);
                 }
-                'y' if !edit && !search =>
+                'y' if !edit && !search && !digraph =>
                 {
                     //copy line
                     clip = files[n].lines[line].clone();
                 }
-                'd' if !edit && !search =>
+                'd' if !edit && !search && !digraph =>
                 {
                     //cut line
                     placement = 0;
@@ -801,7 +803,7 @@ fn main()
                         },
                     )
                 }
-                'p' if !edit && !search =>
+                'p' if !edit && !search && !digraph =>
                 {
                     //paste line
                     files[n].lines.insert(line, clip.clone());
@@ -821,14 +823,14 @@ fn main()
                         },
                     )
                 }
-                '/' if !edit && !search =>
+                '/' if !edit && !search && !digraph =>
                 {
                     //enable search
                     search = true;
                     orig = (line, placement);
                     word = Vec::new()
                 }
-                'q' if !edit && !search =>
+                'q' if !edit && !search && !digraph =>
                 {
                     //quit
                     print!("\x1b[G\x1b[{}B\x1b[?1049l", height);
@@ -836,12 +838,20 @@ fn main()
                     terminal::disable_raw_mode().unwrap();
                     std::process::exit(0);
                 }
-                'i' if !edit && !search =>
+                'i' if !edit && !search && !digraph =>
                 {
                     //enable edit mode
                     edit = true;
                 }
-                'u' if !edit && !search && files[n].history.list.len() != files[n].history.pos =>
+                'v' if !edit && !search && !digraph =>
+                {
+                    //enable digraph mode
+                    digraph = true;
+                }
+                'u' if !edit
+                    && !search
+                    && !digraph
+                    && files[n].history.list.len() != files[n].history.pos =>
                 {
                     //undo
                     match (
@@ -919,7 +929,7 @@ fn main()
                     clear(&files[n].lines, top, height, start, width);
                     files[n].history.pos += 1;
                 }
-                'U' if !edit && !search && files[n].history.pos > 0 =>
+                'U' if !edit && !search && !digraph && files[n].history.pos > 0 =>
                 {
                     //redo
                     files[n].history.pos -= 1;
@@ -994,7 +1004,7 @@ fn main()
                     start = fix_top(start, placement, width);
                     clear(&files[n].lines, top, height, start, width);
                 }
-                's' if !edit && !search =>
+                's' if !edit && !search && !digraph =>
                 {
                     match get_word(&mut stdout, height)
                     {
@@ -1013,7 +1023,7 @@ fn main()
                         }
                     };
                 }
-                'o' if !edit && !search =>
+                'o' if !edit && !search && !digraph =>
                 {
                     match get_word(&mut stdout, height)
                     {
@@ -1049,9 +1059,70 @@ fn main()
                     || c == '\t'
                     || c == '\n' =>
                 {
-                    if edit
+                    if edit || digraph
                     {
-                        files[n].lines[line].insert(placement, c);
+                        files[n].lines[line].insert(
+                            placement,
+                            if digraph
+                            {
+                                match c
+                                {
+                                    'a' => 'α',
+                                    'A' => 'Α',
+                                    'b' => 'β',
+                                    'B' => 'Β',
+                                    'c' => 'ξ',
+                                    'C' => 'Ξ',
+                                    'd' => 'Δ',
+                                    'D' => 'δ',
+                                    'e' => 'ε',
+                                    'E' => 'Ε',
+                                    'f' => 'φ',
+                                    'F' => 'Φ',
+                                    'g' => 'γ',
+                                    'G' => 'Γ',
+                                    'h' => 'η',
+                                    'H' => 'Η',
+                                    'i' => 'ι',
+                                    'I' => 'Ι',
+                                    'k' => 'κ',
+                                    'K' => 'Κ',
+                                    'l' => 'λ',
+                                    'L' => 'Λ',
+                                    'm' => 'μ',
+                                    'M' => 'Μ',
+                                    'n' => 'ν',
+                                    'N' => 'Ν',
+                                    'o' => 'ο',
+                                    'O' => 'Ο',
+                                    'p' => 'π',
+                                    'P' => 'Π',
+                                    'q' => 'θ',
+                                    'Q' => 'Θ',
+                                    'r' => 'ρ',
+                                    'R' => 'Ρ',
+                                    's' => 'σ',
+                                    'S' => 'Σ',
+                                    't' => 'τ',
+                                    'T' => 'Τ',
+                                    'u' => 'υ',
+                                    'U' => 'Υ',
+                                    'w' => 'ω',
+                                    'W' => 'Ω',
+                                    'y' => 'ψ',
+                                    'Y' => 'Ψ',
+                                    'x' => 'χ',
+                                    'X' => 'Χ',
+                                    'z' => 'ζ',
+                                    'Z' => 'Ζ',
+                                    _ => continue,
+                                }
+                            }
+                            else
+                            {
+                                c
+                            },
+                        );
                         if placement + 1 == width + start
                         {
                             placement += 1;

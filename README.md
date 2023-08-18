@@ -13,9 +13,9 @@ windows files are converted to linux
 
 requires modern terminal on windows, like windows terminal
 ## keybindings
-``i`` to enter edit mode
+``i`` edit mode
 
-``esc`` to exit edit mode
+``esc`` exit all modes
 
 ``h`` left
 
@@ -59,4 +59,6 @@ requires modern terminal on windows, like windows terminal
 
 ``U``  redo
 
-``/``  search
+``/`` search mode
+
+``v`` greek mode

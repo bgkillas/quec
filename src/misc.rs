@@ -18,8 +18,8 @@ use {
 pub fn help()
 {
     println!(
-        "'i' to enter edit mode\n\
-'esc' to exit edit mode\n\
+        "'i' edit mode\n\
+'esc' exit all modes\n\
 'h' left\n\
 'l' right\n\
 'j' down\n\
@@ -41,7 +41,8 @@ pub fn help()
 'q' quit\n\
 'u' undo\n\
 'U' redo\n\
-'/' search"
+'/' search mode\n\
+'v' greek mode"
     );
 }
 pub fn fix_history(history: &mut History)
@@ -89,8 +90,8 @@ pub fn read_single_char() -> char
         {
             (KeyCode::Char(c), KeyModifiers::NONE | KeyModifiers::SHIFT) => c,
             (KeyCode::Char('c'), KeyModifiers::CONTROL) => '\x14',
-            (KeyCode::Esc, KeyModifiers::NONE) => '\x1A',
             (KeyCode::Enter, KeyModifiers::NONE) => '\n',
+            (KeyCode::Esc, KeyModifiers::NONE) => '\x1A',
             (KeyCode::Backspace, KeyModifiers::NONE) => '\x08',
             (KeyCode::Char('h'), KeyModifiers::CONTROL) => '\x15', //weird bug ctrl+backspace=ctrl+h
             (KeyCode::Left, KeyModifiers::CONTROL) => '\x12',
