@@ -128,42 +128,19 @@ fn main()
                     if edit
                     {
                         line += 1;
-                        if line + 1 == files[n].lines.len() && placement == 0
+                        let mut ln = files[n].lines[line - 1][placement..].to_vec();
+                        files[n].lines.insert(line, ln);
+                        ln = files[n].lines[line - 1][..placement].to_vec();
+                        files[n].lines.insert(line, ln);
+                        files[n].lines.remove(line - 1);
+                        placement = 0;
+                        files[n].cursor = placement;
+                        start = 0;
+                        if line == height + top
                         {
-                            files[n].lines.push(Vec::new());
-                            placement = 0;
-                            files[n].cursor = placement;
-                            if start != 0
-                            {
-                                start = 0;
-                                if line == height + top
-                                {
-                                    top += 1;
-                                }
-                                clear(&files[n].lines, top, height, start, width);
-                            }
-                            else if line == height + top
-                            {
-                                top += 1;
-                                clear(&files[n].lines, top, height, start, width);
-                            }
+                            top += 1;
                         }
-                        else
-                        {
-                            let mut ln = files[n].lines[line - 1][placement..].to_vec();
-                            files[n].lines.insert(line, ln);
-                            ln = files[n].lines[line - 1][..placement].to_vec();
-                            files[n].lines.insert(line, ln);
-                            files[n].lines.remove(line - 1);
-                            placement = 0;
-                            files[n].cursor = placement;
-                            start = 0;
-                            if line == height + top
-                            {
-                                top += 1;
-                            }
-                            clear(&files[n].lines, top, height, start, width);
-                        }
+                        clear(&files[n].lines, top, height, start, width);
                         fix_history(&mut files[n].history);
                         files[n].history.list.insert(
                             0,
@@ -472,7 +449,7 @@ fn main()
                         clear(&files[n].lines, top, height, start, width);
                     }
                 }
-                '\x1B' | 'h' if c != 'h' || !edit && !search && !digraph =>
+                '\x1B' | 'h' if c != 'h' || (!edit && !search && !digraph) =>
                 {
                     //left
                     if placement == 0
@@ -523,7 +500,7 @@ fn main()
                         ln = (line, placement);
                     }
                 }
-                '\x1C' | 'l' if c != 'l' || !edit && !search && !digraph =>
+                '\x1C' | 'l' if c != 'l' || (!edit && !search && !digraph) =>
                 {
                     //right
                     if placement == files[n].lines[line].len()
@@ -573,7 +550,7 @@ fn main()
                         ln = (line, placement);
                     }
                 }
-                '\x1D' | 'k' if c != 'k' || !edit && !search && !digraph =>
+                '\x1D' | 'k' if c != 'k' || (!edit && !search && !digraph) =>
                 {
                     //up
                     if line == 0
@@ -638,7 +615,7 @@ fn main()
                         ln = (line, placement);
                     }
                 }
-                '\x1E' | 'j' if c != 'j' || !edit && !search && !digraph =>
+                '\x1E' | 'j' if c != 'j' || (!edit && !search && !digraph) =>
                 {
                     //down
                     if line + 1 == files[n].lines.len()
@@ -701,7 +678,6 @@ fn main()
                     edit = false;
                     search = false;
                     digraph = false;
-                    //clear(&files[n].lines, top, height, start, width);
                 }
                 '`' if !edit && !search && !digraph && n + 1 != files.len() =>
                 {
@@ -1005,49 +981,31 @@ fn main()
                 }
                 's' if !edit && !search && !digraph =>
                 {
-                    match get_word(&mut stdout, height)
+                    if let Ok(file_path) = get_word(&mut stdout, height)
                     {
-                        Ok(file_path) =>
-                        {
-                            files[n].save_file_path = file_path;
-                            err = save_file(&mut files[n], history_dir.clone());
-                            line = min(line, files[n].lines.len() - 1);
-                            placement = min(placement, files[n].lines[line].len());
-                            top = fix_top(top, line, height);
-                            start = fix_top(start, placement, width);
-                        }
-                        Err(()) =>
-                        {
-                            clear(&files[n].lines, top, height, start, width);
-                        }
+                        files[n].save_file_path = file_path;
+                        err = save_file(&mut files[n], history_dir.clone());
                     };
                 }
                 'o' if !edit && !search && !digraph =>
                 {
-                    match get_word(&mut stdout, height)
+                    if let Ok(file_path) = get_word(&mut stdout, height)
                     {
-                        Ok(file_path) =>
+                        let j = n;
+                        for (index, file) in files.iter().enumerate()
                         {
-                            let j = n;
-                            for (index, file) in files.iter().enumerate()
+                            if file.save_file_path == file_path
                             {
-                                if file.save_file_path == file_path
-                                {
-                                    n = index;
-                                }
+                                n = index;
                             }
-                            if n == j
-                            {
-                                files.push(open_file(file_path, history_dir.clone()));
-                                n = files.len() - 1;
-                            }
-                            print!("\x1b[H\x1b[J");
-                            continue 'outer;
                         }
-                        Err(()) =>
+                        if n == j
                         {
-                            clear(&files[n].lines, top, height, start, width);
+                            files.push(open_file(file_path, history_dir.clone()));
+                            n = files.len() - 1;
                         }
+                        print!("\x1b[H\x1b[J");
+                        continue 'outer;
                     };
                 }
                 '\0' =>
