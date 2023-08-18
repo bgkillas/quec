@@ -16,7 +16,6 @@ use std::{
     fs::create_dir,
     io::{stdout, Write},
 };
-//support ctrl+backspace and alt+movement
 //digraph support
 //use Vec<String> instead of Vec<Vec<char>>
 fn main()
@@ -232,7 +231,7 @@ fn main()
                                 }
                                 else
                                 {
-                                    print!("\x08\x1b[K");
+                                    print!("\x1b[D\x1b[K");
                                 }
                             }
                             else if placement + 1 == start
@@ -242,7 +241,7 @@ fn main()
                             }
                             else
                             {
-                                print!("\x08");
+                                print!("\x1b[D");
                                 clear_line(&files[n].lines, line, placement, width, start)
                             }
                         }
@@ -253,25 +252,70 @@ fn main()
                         word.pop();
                     }
                 }
+                '\x15' if edit && placement != 0 =>
+                {
+                    //ctrl+back
+                    let initial = placement;
+                    let mut did = false;
+                    let mut on_white = files[n].lines[line][placement - 1].is_whitespace();
+                    for (i, c) in files[n].lines[line][..placement - 1]
+                        .iter()
+                        .rev()
+                        .enumerate()
+                    {
+                        if c.is_whitespace()
+                        {
+                            if !on_white
+                            {
+                                placement -= i;
+                                placement -= 1;
+                                did = true;
+                                files[n].cursor = placement;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            on_white = false;
+                        }
+                    }
+                    if !did
+                    {
+                        placement = 0;
+                    }
+                    fix_history(&mut files[n].history);
+                    let ln = files[n].lines[line].drain(placement..initial).collect();
+                    files[n].history.list.insert(
+                        0,
+                        Point {
+                            add: false,
+                            split: true,
+                            pos: (line, placement),
+                            char: '\0',
+                            line: Some(ln),
+                        },
+                    );
+                    if start > placement
+                    {
+                        start = placement;
+                        clear(&files[n].lines, top, height, start, width);
+                    }
+                    else
+                    {
+                        print!("\x1b[{}D", initial - placement);
+                        clear_line(&files[n].lines, line, placement, width, start)
+                    }
+                }
                 '\x01' =>
                 {
                     //home
                     placement = 0;
                     line = 0;
-                    if files[n].lines.len() > height
+                    if top != 0 || start != 0
                     {
                         top = 0;
-                        start = fix_top(start, placement, width);
+                        start = 0;
                         clear(&files[n].lines, top, height, start, width);
-                    }
-                    else
-                    {
-                        let s = start;
-                        start = fix_top(start, placement, width);
-                        if s != 0
-                        {
-                            clear(&files[n].lines, top, height, start, width);
-                        }
                     }
                     files[n].cursor = placement;
                     if search
@@ -284,20 +328,11 @@ fn main()
                     //end
                     line = files[n].lines.len() - 1;
                     placement = files[n].lines[line].len();
-                    if files[n].lines.len() > height
+                    if files[n].lines.len() > height || placement > width
                     {
-                        top = files[n].lines.len() - height;
-                        start = fix_top(start, placement, width);
+                        top = files[n].lines.len().saturating_sub(height);
+                        start = placement.saturating_sub(width);
                         clear(&files[n].lines, top, height, start, width);
-                    }
-                    else
-                    {
-                        let s = start;
-                        start = fix_top(start, placement, width);
-                        if s != start
-                        {
-                            clear(&files[n].lines, top, height, start, width);
-                        }
                     }
                     files[n].cursor = placement;
                     if search
@@ -367,6 +402,74 @@ fn main()
                     if search
                     {
                         ln = (line, placement);
+                    }
+                }
+                '\x12' if placement != 0 =>
+                {
+                    //ctrl+left
+                    let mut did = false;
+                    let mut on_white = files[n].lines[line][placement - 1].is_whitespace();
+                    for (i, c) in files[n].lines[line][..placement - 1]
+                        .iter()
+                        .rev()
+                        .enumerate()
+                    {
+                        if c.is_whitespace()
+                        {
+                            if !on_white
+                            {
+                                placement -= i;
+                                placement -= 1;
+                                did = true;
+                                files[n].cursor = placement;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            on_white = false;
+                        }
+                    }
+                    if !did
+                    {
+                        placement = 0;
+                    }
+                    if start > placement
+                    {
+                        start = placement;
+                        clear(&files[n].lines, top, height, start, width);
+                    }
+                }
+                '\x13' =>
+                {
+                    //ctrl+right
+                    let mut did = false;
+                    let mut on_white = files[n].lines[line][placement].is_whitespace();
+                    for (i, c) in files[n].lines[line][placement..].iter().enumerate()
+                    {
+                        if !c.is_whitespace()
+                        {
+                            if on_white
+                            {
+                                placement += i;
+                                files[n].cursor = placement;
+                                did = true;
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            on_white = true
+                        }
+                    }
+                    if !did
+                    {
+                        placement = files[n].lines[line].len();
+                    }
+                    if start + width < placement
+                    {
+                        start += placement - (start + width);
+                        clear(&files[n].lines, top, height, start, width);
                     }
                 }
                 '\x1B' | 'h' if c != 'h' || !edit && !search =>
@@ -799,6 +902,15 @@ fn main()
                             placement = 0;
                             files[n].lines.remove(line);
                         }
+                        (false, true, Some(l)) =>
+                        {
+                            line = files[n].history.list[files[n].history.pos].pos.0;
+                            placement = files[n].history.list[files[n].history.pos].pos.1;
+                            let mut un = l.clone();
+                            un.extend(files[n].lines[line].drain(placement..));
+                            files[n].lines[line].extend(&un);
+                            placement += l.len();
+                        }
                         _ => unimplemented!(),
                     }
                     files[n].cursor = placement;
@@ -868,6 +980,12 @@ fn main()
                             {
                                 files[n].lines.insert(line, l.clone());
                             }
+                        }
+                        (false, true, Some(l)) =>
+                        {
+                            line = files[n].history.list[files[n].history.pos].pos.0;
+                            placement = files[n].history.list[files[n].history.pos].pos.1;
+                            files[n].lines[line].drain(placement..placement + l.len());
                         }
                         _ => unimplemented!(),
                     }

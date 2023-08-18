@@ -92,10 +92,11 @@ pub fn read_single_char() -> char
             (KeyCode::Esc, KeyModifiers::NONE) => '\x1A',
             (KeyCode::Enter, KeyModifiers::NONE) => '\n',
             (KeyCode::Backspace, KeyModifiers::NONE) => '\x08',
+            (KeyCode::Char('h'), KeyModifiers::CONTROL) => '\x15', //weird bug ctrl+backspace=ctrl+h
+            (KeyCode::Left, KeyModifiers::CONTROL) => '\x12',
+            (KeyCode::Right, KeyModifiers::CONTROL) => '\x13',
             (KeyCode::Left, KeyModifiers::NONE) => '\x1B',
             (KeyCode::Right, KeyModifiers::NONE) => '\x1C',
-            (KeyCode::Left, KeyModifiers::ALT) => '\x12',
-            (KeyCode::Right, KeyModifiers::ALT) => '\x13',
             (KeyCode::Up, KeyModifiers::NONE) => '\x1D',
             (KeyCode::Down, KeyModifiers::NONE) => '\x1E',
             (KeyCode::PageDown, KeyModifiers::NONE) => '\x04',
