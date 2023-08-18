@@ -16,7 +16,6 @@ use std::{
     fs::create_dir,
     io::{stdout, Write},
 };
-//use Vec<String> instead of Vec<Vec<char>>
 fn main()
 {
     let mut args = args().collect::<Vec<String>>();

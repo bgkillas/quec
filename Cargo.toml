@@ -1,6 +1,6 @@
 [package]
 name         = "quec"
-version      = "0.1.3"
+version      = "0.1.4"
 edition      = "2021"
 description  = "a simple text editor"
 license      = "GPL-3.0-only"
