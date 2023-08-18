@@ -128,7 +128,7 @@ fn main()
                         line += 1;
                         let mut ln: Vec<char> = files[n].lines[line - 1][..placement]
                             .iter()
-                            .take_while(|&&c| c == ' ')
+                            .take_while(|&&c| c == ' ' || c == '\t')
                             .cloned()
                             .collect();
                         let count = ln.len();
