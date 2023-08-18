@@ -396,7 +396,6 @@ fn main()
                                 placement -= i;
                                 placement -= 1;
                                 did = true;
-                                files[n].cursor = placement;
                                 break;
                             }
                         }
@@ -409,13 +408,14 @@ fn main()
                     {
                         placement = 0;
                     }
+                    files[n].cursor = placement;
                     if start > placement
                     {
                         start = placement;
                         clear(&files[n].lines, top, height, start, width);
                     }
                 }
-                '\x13' =>
+                '\x13' if files[n].lines[line].len() != placement =>
                 {
                     //ctrl+right
                     let mut did = false;
@@ -427,7 +427,6 @@ fn main()
                             if on_white
                             {
                                 placement += i;
-                                files[n].cursor = placement;
                                 did = true;
                                 break;
                             }
@@ -441,9 +440,10 @@ fn main()
                     {
                         placement = files[n].lines[line].len();
                     }
+                    files[n].cursor = placement;
                     if start + width < placement
                     {
-                        start += placement - (start + width);
+                        start += placement - (start + width) + 1;
                         clear(&files[n].lines, top, height, start, width);
                     }
                 }
