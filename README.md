@@ -29,6 +29,8 @@ requires modern terminal on windows, like windows terminal
 
 ``$`` move to end of line
 
+``ins`` insert mode
+
 ``page down`` move 1 page down
 
 ``page up`` move 1 page up

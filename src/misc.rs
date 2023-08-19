@@ -26,6 +26,7 @@ pub fn help()
 'k' up\n\
 '0' move to beginning of line\n\
 '$' move to end of line\n\
+'ins' insert mode\n\
 'page down' move 1 page down\n\
 'page up' move 1 page up\n\
 'home' go to start of file\n\
@@ -104,6 +105,7 @@ pub fn read_single_char() -> char
             (KeyCode::PageUp, KeyModifiers::NONE) => '\x03',
             (KeyCode::End, KeyModifiers::NONE) => '\x02',
             (KeyCode::Home, KeyModifiers::NONE) => '\x01',
+            (KeyCode::Insert, KeyModifiers::NONE) => '\x05',
             (KeyCode::Tab, KeyModifiers::NONE) => '\t',
             _ => '\0',
         },

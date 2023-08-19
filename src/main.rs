@@ -8,6 +8,7 @@ use crate::{
         clear, clear_line, fix_history, fix_top, get_dimensions, help, print_line_number,
         read_single_char,
     },
+    Mode::{Default, Digraph, Edit, Insert, Search},
 };
 use crossterm::terminal;
 use std::{
@@ -94,9 +95,7 @@ fn main()
         );
         stdout.flush().unwrap();
         let mut err = String::new();
-        let mut edit = false;
-        let mut search = false;
-        let mut digraph = false;
+        let mut mode: Mode = Default;
         let mut ln: (usize, usize) = (0, 0);
         let mut orig: (usize, usize) = (0, 0);
         let mut word: Vec<char> = Vec::new();
@@ -120,10 +119,10 @@ fn main()
             let c = read_single_char();
             match c
             {
-                '\n' if !search =>
+                '\n' if mode != Search =>
                 {
                     //enter
-                    if edit
+                    if mode == Edit
                     {
                         line += 1;
                         let mut ln: Vec<char> = files[n].lines[line - 1][..placement]
@@ -160,7 +159,7 @@ fn main()
                 '\x08' =>
                 {
                     //backspace
-                    if edit
+                    if mode == Edit
                     {
                         if placement == 0
                         {
@@ -227,12 +226,12 @@ fn main()
                         }
                         files[n].cursor = placement;
                     }
-                    else if search && !word.is_empty()
+                    else if mode == Search && !word.is_empty()
                     {
                         word.pop();
                     }
                 }
-                '\x15' if edit && placement != 0 =>
+                '\x15' if mode == Edit && placement != 0 =>
                 {
                     //ctrl+back
                     let initial = placement;
@@ -298,7 +297,7 @@ fn main()
                         clear(&files[n].lines, top, height, start, width);
                     }
                     files[n].cursor = placement;
-                    if search
+                    if mode == Search
                     {
                         ln = (line, placement);
                     }
@@ -315,7 +314,7 @@ fn main()
                         clear(&files[n].lines, top, height, start, width);
                     }
                     files[n].cursor = placement;
-                    if search
+                    if mode == Search
                     {
                         ln = (line, placement);
                     }
@@ -350,7 +349,7 @@ fn main()
                         clear(&files[n].lines, top, height, start, width);
                     }
                     files[n].cursor = placement;
-                    if search
+                    if mode == Search
                     {
                         ln = (line, placement);
                     }
@@ -379,7 +378,7 @@ fn main()
                         clear(&files[n].lines, top, height, start, width);
                     }
                     files[n].cursor = placement;
-                    if search
+                    if mode == Search
                     {
                         ln = (line, placement);
                     }
@@ -452,7 +451,7 @@ fn main()
                         clear(&files[n].lines, top, height, start, width);
                     }
                 }
-                '\x1B' | 'h' if c != 'h' || (!edit && !search && !digraph) =>
+                '\x1B' | 'h' if c != 'h' || mode == Default =>
                 {
                     //left
                     if placement == 0
@@ -498,12 +497,12 @@ fn main()
                         }
                     }
                     files[n].cursor = placement;
-                    if search
+                    if mode == Search
                     {
                         ln = (line, placement);
                     }
                 }
-                '\x1C' | 'l' if c != 'l' || (!edit && !search && !digraph) =>
+                '\x1C' | 'l' if c != 'l' || mode == Default =>
                 {
                     //right
                     if placement == files[n].lines[line].len()
@@ -548,12 +547,12 @@ fn main()
                         }
                     }
                     files[n].cursor = placement;
-                    if search
+                    if mode == Search
                     {
                         ln = (line, placement);
                     }
                 }
-                '\x1D' | 'k' if c != 'k' || (!edit && !search && !digraph) =>
+                '\x1D' | 'k' if c != 'k' || mode == Default =>
                 {
                     //up
                     if line == 0
@@ -613,12 +612,12 @@ fn main()
                             clear(&files[n].lines, top, height, start, width);
                         }
                     }
-                    if search
+                    if mode == Search
                     {
                         ln = (line, placement);
                     }
                 }
-                '\x1E' | 'j' if c != 'j' || (!edit && !search && !digraph) =>
+                '\x1E' | 'j' if c != 'j' || mode == Default =>
                 {
                     //down
                     if line + 1 == files[n].lines.len()
@@ -670,19 +669,13 @@ fn main()
                             clear(&files[n].lines, top, height, start, width);
                         }
                     }
-                    if search
+                    if mode == Search
                     {
                         ln = (line, placement);
                     }
                 }
-                '\x1A' =>
-                {
-                    //esc
-                    edit = false;
-                    search = false;
-                    digraph = false;
-                }
-                '`' if !edit && !search && !digraph && n + 1 != files.len() =>
+                '\x1A' => mode = Default, //esc
+                '`' if mode == Default && n + 1 != files.len() =>
                 {
                     //next file
                     files[n].placement = placement;
@@ -693,7 +686,7 @@ fn main()
                     print!("\x1b[H\x1b[J");
                     continue 'outer;
                 }
-                '~' if !edit && !search && !digraph && n != 0 =>
+                '~' if mode == Default && n != 0 =>
                 {
                     //last file
                     files[n].placement = placement;
@@ -704,7 +697,7 @@ fn main()
                     print!("\x1b[H\x1b[J");
                     continue 'outer;
                 }
-                '0' if !edit && !search && !digraph =>
+                '0' if mode == Default =>
                 {
                     //start of line
                     placement = 0;
@@ -714,12 +707,12 @@ fn main()
                         start = 0;
                         clear(&files[n].lines, top, height, start, width);
                     }
-                    if search
+                    if mode == Search
                     {
                         ln = (line, placement);
                     }
                 }
-                '$' if !edit && !search && !digraph =>
+                '$' if mode == Default =>
                 {
                     //end of line
                     placement = files[n].lines[line].len();
@@ -729,12 +722,12 @@ fn main()
                         start = placement - width + 1;
                         clear(&files[n].lines, top, height, start, width);
                     }
-                    if search
+                    if mode == Search
                     {
                         ln = (line, placement);
                     }
                 }
-                'w' if !edit && !search && !digraph =>
+                'w' if mode == Default =>
                 {
                     //save
                     err = save_file(&mut files[n], &history_dir);
@@ -743,12 +736,12 @@ fn main()
                     top = fix_top(top, line, height);
                     start = fix_top(start, placement, width);
                 }
-                'y' if !edit && !search && !digraph =>
+                'y' if mode == Default =>
                 {
                     //copy line
                     clip = files[n].lines[line].clone();
                 }
-                'd' if !edit && !search && !digraph =>
+                'd' if mode == Default =>
                 {
                     //cut line
                     placement = 0;
@@ -781,7 +774,7 @@ fn main()
                         },
                     )
                 }
-                'p' if !edit && !search && !digraph =>
+                'p' if mode == Default =>
                 {
                     //paste line
                     files[n].lines.insert(line, clip.clone());
@@ -801,14 +794,14 @@ fn main()
                         },
                     )
                 }
-                '/' if !edit && !search && !digraph =>
+                '/' if mode == Default =>
                 {
                     //enable search
-                    search = true;
+                    mode = Search;
                     orig = (line, placement);
                     word = Vec::new()
                 }
-                'q' if !edit && !search && !digraph =>
+                'q' if mode == Default =>
                 {
                     //quit
                     print!("\x1b[G\x1b[{}B\x1b[?1049l", height);
@@ -816,20 +809,10 @@ fn main()
                     terminal::disable_raw_mode().unwrap();
                     std::process::exit(0);
                 }
-                'i' if !edit && !search && !digraph =>
-                {
-                    //enable edit mode
-                    edit = true;
-                }
-                'v' if !edit && !search && !digraph =>
-                {
-                    //enable digraph mode
-                    digraph = true;
-                }
-                'u' if !edit
-                    && !search
-                    && !digraph
-                    && files[n].history.list.len() != files[n].history.pos =>
+                '\x05' if mode == Default || mode == Edit => mode = Insert,
+                'i' if mode == Default => mode = Edit,
+                'v' if mode == Default => mode = Digraph,
+                'u' if mode == Default && files[n].history.list.len() != files[n].history.pos =>
                 {
                     //undo
                     match (
@@ -907,7 +890,7 @@ fn main()
                     clear(&files[n].lines, top, height, start, width);
                     files[n].history.pos += 1;
                 }
-                'U' if !edit && !search && !digraph && files[n].history.pos > 0 =>
+                'U' if mode == Default && files[n].history.pos > 0 =>
                 {
                     //redo
                     files[n].history.pos -= 1;
@@ -982,7 +965,7 @@ fn main()
                     start = fix_top(start, placement, width);
                     clear(&files[n].lines, top, height, start, width);
                 }
-                's' if !edit && !search && !digraph =>
+                's' if mode == Default =>
                 {
                     if let Ok(file_path) = get_word(&mut stdout, height)
                     {
@@ -990,7 +973,7 @@ fn main()
                         err = save_file(&mut files[n], &history_dir);
                     };
                 }
-                'o' if !edit && !search && !digraph =>
+                'o' if mode == Default =>
                 {
                     if let Ok(file_path) = get_word(&mut stdout, height)
                     {
@@ -1019,11 +1002,15 @@ fn main()
                     || c == '\t'
                     || c == '\n' =>
                 {
-                    if edit || digraph
+                    if mode == Edit || mode == Digraph || mode == Insert
                     {
+                        if mode == Insert && files[n].lines[line].len() != placement
+                        {
+                            files[n].lines[line].remove(placement);
+                        }
                         files[n].lines[line].insert(
                             placement,
-                            if digraph
+                            if mode == Digraph
                             {
                                 match c
                                 {
@@ -1108,7 +1095,7 @@ fn main()
                             },
                         )
                     }
-                    else if search
+                    else if mode == Search
                     {
                         if c != '\n'
                         {
@@ -1158,7 +1145,7 @@ fn main()
                 placement,
                 top,
                 start,
-                if search
+                if mode == Search
                 {
                     word.iter().collect()
                 }
@@ -1170,4 +1157,13 @@ fn main()
             stdout.flush().unwrap();
         }
     }
+}
+#[derive(PartialEq)]
+enum Mode
+{
+    Edit,
+    Insert,
+    Search,
+    Digraph,
+    Default,
 }
