@@ -5,9 +5,7 @@ use crossterm::{
 };
 use std::{
     cmp::{min, Ordering},
-    collections::hash_map::DefaultHasher,
     fs::canonicalize,
-    hash::{Hash, Hasher},
     io::{stdout, Write},
 };
 #[cfg(not(unix))]
@@ -44,15 +42,10 @@ pub fn help()
 'q' quit\n\
 'u' undo\n\
 'U' redo\n\
+'g' goto line #\n\
 '/' search mode\n\
 'v' greek mode"
     );
-}
-pub fn hash_vec(v: &[Vec<char>]) -> u64
-{
-    let mut hasher = DefaultHasher::new();
-    v.hash(&mut hasher);
-    hasher.finish()
 }
 pub fn exit()
 {
@@ -94,7 +87,7 @@ pub fn fix_top(top: usize, line: usize, height: usize) -> usize
 }
 pub fn read_single_char() -> char
 {
-    let result = match match read()
+    match match read()
     {
         Ok(c) => c,
         Err(_) => return '\0',
@@ -125,8 +118,7 @@ pub fn read_single_char() -> char
             _ => '\0',
         },
         _ => '\0',
-    };
-    result
+    }
 }
 #[cfg(unix)]
 pub fn get_dimensions() -> (usize, usize)

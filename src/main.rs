@@ -5,8 +5,8 @@ use crate::{
     file::{get_word, open_file, save_file, Files},
     history::{History, Point},
     misc::{
-        clear, clear_line, exit, fix_history, fix_top, get_dimensions, hash_vec, help,
-        print_line_number, read_single_char,
+        clear, clear_line, exit, fix_history, fix_top, get_dimensions, help, print_line_number,
+        read_single_char,
     },
     Mode::{Default, Digraph, Edit, Insert, Search},
 };
@@ -14,7 +14,7 @@ use crossterm::terminal;
 use std::{
     cmp::min,
     env::{args, var},
-    fs::create_dir,
+    fs::{canonicalize, create_dir},
     io::{stdout, Write},
 };
 //replace
@@ -95,7 +95,7 @@ fn main()
             files[n].save_file_path.clone(),
         );
         stdout.flush().unwrap();
-        let mut hash = hash_vec(&files[n].lines);
+        let mut saved = true;
         let mut err = String::new();
         let mut mode: Mode = Default;
         let mut ln: (usize, usize) = (0, 0);
@@ -126,6 +126,7 @@ fn main()
                     //enter
                     if mode == Edit || mode == Digraph
                     {
+                        saved = false;
                         line += 1;
                         let mut ln: Vec<char> = files[n].lines[line - 1][..placement]
                             .iter()
@@ -185,6 +186,7 @@ fn main()
                     //backspace
                     if mode == Edit || mode == Digraph
                     {
+                        saved = false;
                         if placement == 0
                         {
                             if line == 0
@@ -258,6 +260,7 @@ fn main()
                 '\x15' if (mode == Edit || mode == Digraph) && placement != 0 =>
                 {
                     //ctrl+back
+                    saved = false;
                     let initial = placement;
                     let mut did = false;
                     let mut on_white = files[n].lines[line][placement - 1].is_whitespace();
@@ -759,7 +762,7 @@ fn main()
                     placement = min(placement, files[n].lines[line].len());
                     top = fix_top(top, line, height);
                     start = fix_top(start, placement, width);
-                    hash = hash_vec(&files[n].lines);
+                    saved = true;
                 }
                 'y' if mode == Default =>
                 {
@@ -769,6 +772,7 @@ fn main()
                 'd' if mode == Default =>
                 {
                     //cut line
+                    saved = false;
                     placement = 0;
                     files[n].cursor = 0;
                     start = 0;
@@ -802,6 +806,7 @@ fn main()
                 'p' if mode == Default =>
                 {
                     //paste line
+                    saved = false;
                     files[n].lines.insert(line, clip.clone());
                     placement = 0;
                     files[n].cursor = 0;
@@ -819,6 +824,16 @@ fn main()
                         },
                     )
                 }
+                'r' if mode == Default =>
+                {
+                    //TODO
+                    //replace
+                }
+                'R' if mode == Default =>
+                {
+                    //TODO
+                    //replace all
+                }
                 '/' if mode == Default =>
                 {
                     //enable search
@@ -830,7 +845,7 @@ fn main()
                 'q' if mode == Default =>
                 {
                     //quit
-                    if hash == hash_vec(&files[n].lines)
+                    if saved
                     {
                         exit();
                     }
@@ -1003,14 +1018,42 @@ fn main()
                         err = save_file(&mut files[n], &history_dir);
                     };
                 }
+                'g' if mode == Default =>
+                {
+                    //goto line
+                    if let Ok(number) = get_word(&mut stdout, height)
+                    {
+                        match number.parse::<usize>()
+                        {
+                            Ok(num) if num - 1 < files[n].lines.len() =>
+                            {
+                                line = num - 1;
+                                if placement > files[n].lines[line].len()
+                                {
+                                    placement = files[n].lines[line].len();
+                                }
+                                let s = (top, start);
+                                top = fix_top(top, line, height);
+                                start = fix_top(start, placement, width);
+                                if s != (top, start)
+                                {
+                                    clear(&files[n].lines, top, height, start, width);
+                                }
+                            }
+                            Ok(_) => err = "file too short".to_string(),
+                            Err(e) => err = e.to_string(),
+                        }
+                    }
+                }
                 'o' if mode == Default =>
                 {
                     if let Ok(file_path) = get_word(&mut stdout, height)
                     {
                         let j = n;
+                        let path = canonicalize(&file_path).unwrap();
                         for (index, file) in files.iter().enumerate()
                         {
-                            if file.save_file_path == file_path
+                            if canonicalize(&file.save_file_path).unwrap() == path
                             {
                                 n = index;
                             }
@@ -1034,6 +1077,7 @@ fn main()
                 {
                     if mode == Edit || mode == Digraph || mode == Insert
                     {
+                        saved = false;
                         if mode == Insert && files[n].lines[line].len() != placement
                         {
                             files[n].lines[line].remove(placement);
