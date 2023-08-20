@@ -5,8 +5,8 @@ use crate::{
     file::{get_word, open_file, save_file, Files},
     history::{History, Point},
     misc::{
-        clear, clear_line, fix_history, fix_top, get_dimensions, help, print_line_number,
-        read_single_char,
+        clear, clear_line, exit, fix_history, fix_top, get_dimensions, hash_vec, help,
+        print_line_number, read_single_char,
     },
     Mode::{Default, Digraph, Edit, Insert, Search},
 };
@@ -17,6 +17,7 @@ use std::{
     fs::create_dir,
     io::{stdout, Write},
 };
+//replace
 fn main()
 {
     let args = &args().collect::<Vec<String>>()[1..];
@@ -94,6 +95,7 @@ fn main()
             files[n].save_file_path.clone(),
         );
         stdout.flush().unwrap();
+        let mut hash = hash_vec(&files[n].lines);
         let mut err = String::new();
         let mut mode: Mode = Default;
         let mut ln: (usize, usize) = (0, 0);
@@ -122,7 +124,7 @@ fn main()
                 '\n' if mode != Search =>
                 {
                     //enter
-                    if mode == Edit
+                    if mode == Edit || mode == Digraph
                     {
                         line += 1;
                         let mut ln: Vec<char> = files[n].lines[line - 1][..placement]
@@ -155,11 +157,33 @@ fn main()
                             },
                         );
                     }
+                    else
+                    {
+                        if line + 1 != files[n].lines.len()
+                        {
+                            line += 1;
+                        }
+                        placement = files[n].lines[line]
+                            .iter()
+                            .take_while(|&&c| c == ' ' || c == '\t')
+                            .count();
+                        let s = start;
+                        start = fix_top(start, placement, width);
+                        if line == height + top
+                        {
+                            top += 1;
+                            clear(&files[n].lines, top, height, start, width);
+                        }
+                        else if s != start
+                        {
+                            clear(&files[n].lines, top, height, start, width);
+                        }
+                    }
                 }
                 '\x08' =>
                 {
                     //backspace
-                    if mode == Edit
+                    if mode == Edit || mode == Digraph
                     {
                         if placement == 0
                         {
@@ -231,7 +255,7 @@ fn main()
                         word.pop();
                     }
                 }
-                '\x15' if mode == Edit && placement != 0 =>
+                '\x15' if (mode == Edit || mode == Digraph) && placement != 0 =>
                 {
                     //ctrl+back
                     let initial = placement;
@@ -735,6 +759,7 @@ fn main()
                     placement = min(placement, files[n].lines[line].len());
                     top = fix_top(top, line, height);
                     start = fix_top(start, placement, width);
+                    hash = hash_vec(&files[n].lines);
                 }
                 'y' if mode == Default =>
                 {
@@ -801,13 +826,18 @@ fn main()
                     orig = (line, placement);
                     word = Vec::new()
                 }
+                '\x14' | 'Q' if c != 'Q' || mode == Default => exit(), //ctrl+c
                 'q' if mode == Default =>
                 {
                     //quit
-                    print!("\x1b[G\x1b[{}B\x1b[?1049l", height);
-                    stdout.flush().unwrap();
-                    terminal::disable_raw_mode().unwrap();
-                    std::process::exit(0);
+                    if hash == hash_vec(&files[n].lines)
+                    {
+                        exit();
+                    }
+                    else
+                    {
+                        err = "unsaved changes, 'Q' to quit".to_string();
+                    }
                 }
                 '\x05' if mode == Default || mode == Edit => mode = Insert,
                 'i' if mode == Default => mode = Edit,

@@ -5,7 +5,9 @@ use crossterm::{
 };
 use std::{
     cmp::{min, Ordering},
+    collections::hash_map::DefaultHasher,
     fs::canonicalize,
+    hash::{Hash, Hasher},
     io::{stdout, Write},
 };
 #[cfg(not(unix))]
@@ -45,6 +47,19 @@ pub fn help()
 '/' search mode\n\
 'v' greek mode"
     );
+}
+pub fn hash_vec(v: &[Vec<char>]) -> u64
+{
+    let mut hasher = DefaultHasher::new();
+    v.hash(&mut hasher);
+    hasher.finish()
+}
+pub fn exit()
+{
+    print!("\x1b[G\x1b[{}B\x1b[?1049l", get_dimensions().0);
+    stdout().flush().unwrap();
+    terminal::disable_raw_mode().unwrap();
+    std::process::exit(0);
 }
 pub fn fix_history(history: &mut History)
 {
@@ -111,13 +126,6 @@ pub fn read_single_char() -> char
         },
         _ => '\0',
     };
-    if result == '\x14'
-    {
-        print!("\x1b[G\x1b[{}B\x1b[?1049l", get_dimensions().0);
-        stdout().flush().unwrap();
-        terminal::disable_raw_mode().unwrap();
-        std::process::exit(130);
-    }
     result
 }
 #[cfg(unix)]
