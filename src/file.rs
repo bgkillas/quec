@@ -166,13 +166,15 @@ pub fn open_file(save_file_path: &str, history_dir: &str) -> Files
 pub fn get_word(stdout: &mut Stdout, height: usize) -> Result<String, ()>
 {
     let mut index = 0;
-    let mut file_path = Vec::new();
+    let mut word = Vec::new();
+    print!("\x1b[H\x1b[{}B\x1b[K\x1b[G", height + 1,);
+    stdout.flush().unwrap();
     loop
     {
         let c = read_single_char();
         match c
         {
-            '\x1C' if index != file_path.len() =>
+            '\x1C' if index != word.len() =>
             {
                 //right
                 index += 1;
@@ -184,7 +186,7 @@ pub fn get_word(stdout: &mut Stdout, height: usize) -> Result<String, ()>
             }
             '\x08' if index != 0 =>
             {
-                file_path.remove(index - 1);
+                word.remove(index - 1);
                 index = index.saturating_sub(1);
             }
             '\x1A' =>
@@ -196,7 +198,7 @@ pub fn get_word(stdout: &mut Stdout, height: usize) -> Result<String, ()>
             {}
             _ if !c.is_ascii() || c.is_ascii_graphic() || c == ' ' || c == '\t' || c == '\n' =>
             {
-                file_path.insert(index, c);
+                word.insert(index, c);
                 index += 1;
             }
             _ =>
@@ -205,7 +207,7 @@ pub fn get_word(stdout: &mut Stdout, height: usize) -> Result<String, ()>
         print!(
             "\x1b[H\x1b[{}B\x1b[K{}\x1b[G{}",
             height + 1,
-            file_path.iter().collect::<String>(),
+            word.iter().collect::<String>(),
             if index == 0
             {
                 String::new()
@@ -217,5 +219,5 @@ pub fn get_word(stdout: &mut Stdout, height: usize) -> Result<String, ()>
         );
         stdout.flush().unwrap();
     }
-    Ok(file_path.iter().collect())
+    Ok(word.iter().collect())
 }
