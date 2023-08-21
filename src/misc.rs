@@ -42,6 +42,7 @@ pub fn help()
 'q' quit\n\
 'u' undo\n\
 'U' redo\n\
+'R' replace all\n\
 'g' goto line #\n\
 '/' search mode\n\
 'v' greek mode"

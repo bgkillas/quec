@@ -61,6 +61,8 @@ requires modern terminal on windows, like windows terminal
 
 ``U``  redo
 
+``R`` replace all
+
 ``g`` goto line #
 
 ``/`` search mode

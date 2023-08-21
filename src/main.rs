@@ -733,10 +733,6 @@ fn main()
                         start = 0;
                         clear(&files[n].lines, top, height, start, width);
                     }
-                    if mode == Search
-                    {
-                        ln = (line, placement);
-                    }
                 }
                 '$' if mode == Default =>
                 {
@@ -747,10 +743,6 @@ fn main()
                     {
                         start = placement - width + 1;
                         clear(&files[n].lines, top, height, start, width);
-                    }
-                    if mode == Search
-                    {
-                        ln = (line, placement);
                     }
                 }
                 'w' if mode == Default =>
@@ -826,11 +818,6 @@ fn main()
                         },
                     )
                 }
-                'r' if mode == Default =>
-                {
-                    //TODO
-                    //replace
-                }
                 'R' if mode == Default =>
                 {
                     //replace all
@@ -847,11 +834,9 @@ fn main()
                                     if i[j..j + search.len()] == search
                                     {
                                         i.splice(j..j + search.len(), replace.clone());
-                                        //TODO support hist
                                     }
                                 }
                             }
-                            top = fix_top(top, line, height);
                             start = fix_top(start, placement, width);
                             clear(&files[n].lines, top, height, start, width);
                         }
