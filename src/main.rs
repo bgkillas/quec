@@ -922,149 +922,6 @@ fn main()
                         continue 'outer;
                     };
                 }
-                '\0' =>
-                {}
-                _ if !c.is_ascii()
-                    || c.is_ascii_graphic()
-                    || c == ' '
-                    || c == '\t'
-                    || c == '\n' =>
-                {
-                    if mode == Edit || mode == Digraph || mode == Insert
-                    {
-                        saved = false;
-                        if mode == Insert && files[n].lines[line].len() != placement
-                        {
-                            files[n].lines[line].remove(placement);
-                        }
-                        files[n].lines[line].insert(
-                            placement,
-                            if mode == Digraph
-                            {
-                                match c
-                                {
-                                    'a' => 'α',
-                                    'A' => 'Α',
-                                    'b' => 'β',
-                                    'B' => 'Β',
-                                    'c' => 'ξ',
-                                    'C' => 'Ξ',
-                                    'd' => 'Δ',
-                                    'D' => 'δ',
-                                    'e' => 'ε',
-                                    'E' => 'Ε',
-                                    'f' => 'φ',
-                                    'F' => 'Φ',
-                                    'g' => 'γ',
-                                    'G' => 'Γ',
-                                    'h' => 'η',
-                                    'H' => 'Η',
-                                    'i' => 'ι',
-                                    'I' => 'Ι',
-                                    'k' => 'κ',
-                                    'K' => 'Κ',
-                                    'l' => 'λ',
-                                    'L' => 'Λ',
-                                    'm' => 'μ',
-                                    'M' => 'Μ',
-                                    'n' => 'ν',
-                                    'N' => 'Ν',
-                                    'o' => 'ο',
-                                    'O' => 'Ο',
-                                    'p' => 'π',
-                                    'P' => 'Π',
-                                    'q' => 'θ',
-                                    'Q' => 'Θ',
-                                    'r' => 'ρ',
-                                    'R' => 'Ρ',
-                                    's' => 'σ',
-                                    'S' => 'Σ',
-                                    't' => 'τ',
-                                    'T' => 'Τ',
-                                    'u' => 'υ',
-                                    'U' => 'Υ',
-                                    'w' => 'ω',
-                                    'W' => 'Ω',
-                                    'y' => 'ψ',
-                                    'Y' => 'Ψ',
-                                    'x' => 'χ',
-                                    'X' => 'Χ',
-                                    'z' => 'ζ',
-                                    'Z' => 'Ζ',
-                                    _ => continue,
-                                }
-                            }
-                            else
-                            {
-                                c
-                            },
-                        );
-                        if placement + 1 == width + start
-                        {
-                            placement += 1;
-                            files[n].cursor = placement;
-                            start += 1;
-                            clear(&files[n].lines, top, height, start, width);
-                        }
-                        else
-                        {
-                            clear_line(&files[n].lines, line, placement, width, start);
-                            placement += 1;
-                            files[n].cursor = placement;
-                        }
-                        fix_history(&mut files[n].history);
-                        files[n].history.list.insert(
-                            0,
-                            Point {
-                                add: true,
-                                split: false,
-                                pos: (line, placement),
-                                char: c,
-                                line: None,
-                            },
-                        )
-                    }
-                    else if mode == Search
-                    {
-                        if c != '\n'
-                        {
-                            if start + width == placement + word.len() + 1
-                                && files[n].lines[ln.0][ln.1 + word.len()] == c
-                            {
-                                start += 1;
-                                clear(&files[n].lines, top, height, start, width);
-                                stdout.flush().unwrap();
-                            }
-                            ln = orig;
-                            word.push(c);
-                        }
-                        'inner: for (l, i) in files[n].lines.iter().enumerate()
-                        {
-                            if l >= ln.0 && word.len() <= i.len()
-                            {
-                                for j in
-                                    if l == ln.0 { ln.1 + 1 } else { 0 }..(i.len() - word.len() + 1)
-                                {
-                                    if i[j..j + word.len()] == word
-                                    {
-                                        ln = (l, j);
-                                        (line, placement) = ln;
-                                        top = fix_top(top, line, height);
-                                        start = fix_top(start, placement, width);
-                                        if start + width == placement + 1
-                                        {
-                                            start += word.len()
-                                        }
-                                        files[n].cursor = placement;
-                                        clear(&files[n].lines, top, height, start, width);
-                                        break 'inner;
-                                    }
-                                }
-                                ln = (0, 0);
-                            }
-                        }
-                    }
-                }
                 'u' if mode == Default && files[n].history.list.len() != files[n].history.pos =>
                 {
                     //undo
@@ -1217,6 +1074,149 @@ fn main()
                     top = fix_top(top, line, height);
                     start = fix_top(start, placement, width);
                     clear(&files[n].lines, top, height, start, width);
+                }
+                '\0' =>
+                {}
+                _ if !c.is_ascii()
+                    || c.is_ascii_graphic()
+                    || c == ' '
+                    || c == '\t'
+                    || c == '\n' =>
+                {
+                    if mode == Edit || mode == Digraph || mode == Insert
+                    {
+                        saved = false;
+                        if mode == Insert && files[n].lines[line].len() != placement
+                        {
+                            files[n].lines[line].remove(placement);
+                        }
+                        files[n].lines[line].insert(
+                            placement,
+                            if mode == Digraph
+                            {
+                                match c
+                                {
+                                    'a' => 'α',
+                                    'A' => 'Α',
+                                    'b' => 'β',
+                                    'B' => 'Β',
+                                    'c' => 'ξ',
+                                    'C' => 'Ξ',
+                                    'd' => 'Δ',
+                                    'D' => 'δ',
+                                    'e' => 'ε',
+                                    'E' => 'Ε',
+                                    'f' => 'φ',
+                                    'F' => 'Φ',
+                                    'g' => 'γ',
+                                    'G' => 'Γ',
+                                    'h' => 'η',
+                                    'H' => 'Η',
+                                    'i' => 'ι',
+                                    'I' => 'Ι',
+                                    'k' => 'κ',
+                                    'K' => 'Κ',
+                                    'l' => 'λ',
+                                    'L' => 'Λ',
+                                    'm' => 'μ',
+                                    'M' => 'Μ',
+                                    'n' => 'ν',
+                                    'N' => 'Ν',
+                                    'o' => 'ο',
+                                    'O' => 'Ο',
+                                    'p' => 'π',
+                                    'P' => 'Π',
+                                    'q' => 'θ',
+                                    'Q' => 'Θ',
+                                    'r' => 'ρ',
+                                    'R' => 'Ρ',
+                                    's' => 'σ',
+                                    'S' => 'Σ',
+                                    't' => 'τ',
+                                    'T' => 'Τ',
+                                    'u' => 'υ',
+                                    'U' => 'Υ',
+                                    'w' => 'ω',
+                                    'W' => 'Ω',
+                                    'y' => 'ψ',
+                                    'Y' => 'Ψ',
+                                    'x' => 'χ',
+                                    'X' => 'Χ',
+                                    'z' => 'ζ',
+                                    'Z' => 'Ζ',
+                                    _ => continue,
+                                }
+                            }
+                            else
+                            {
+                                c
+                            },
+                        );
+                        if placement + 1 == width + start
+                        {
+                            placement += 1;
+                            files[n].cursor = placement;
+                            start += 1;
+                            clear(&files[n].lines, top, height, start, width);
+                        }
+                        else
+                        {
+                            clear_line(&files[n].lines, line, placement, width, start);
+                            placement += 1;
+                            files[n].cursor = placement;
+                        }
+                        fix_history(&mut files[n].history);
+                        files[n].history.list.insert(
+                            0,
+                            Point {
+                                add: true,
+                                split: false,
+                                pos: (line, placement),
+                                char: c,
+                                line: None,
+                            },
+                        )
+                    }
+                    else if mode == Search
+                    {
+                        if c != '\n'
+                        {
+                            if start + width == placement + word.len() + 1
+                                && files[n].lines[ln.0][ln.1 + word.len()] == c
+                            {
+                                start += 1;
+                                clear(&files[n].lines, top, height, start, width);
+                                stdout.flush().unwrap();
+                            }
+                            ln = orig;
+                            word.push(c);
+                        }
+                        'inner: for (l, i) in files[n].lines.iter().enumerate()
+                        {
+                            if l >= ln.0 && word.len() <= i.len()
+                            {
+                                for j in
+                                    if l == ln.0 { ln.1 + 1 } else { 0 }..(i.len() - word.len() + 1)
+                                {
+                                    if i[j..j + word.len()] == word
+                                    {
+                                        ln = (l, j);
+                                        (line, placement) = ln;
+                                        top = fix_top(top, line, height);
+                                        start = fix_top(start, placement, width);
+                                        if start + width == placement + 1
+                                        {
+                                            start += word.len()
+                                        }
+                                        files[n].cursor = placement;
+                                        clear(&files[n].lines, top, height, start, width);
+                                        break 'inner;
+                                    }
+                                }
+                                ln = (0, 0);
+                            }
+                        }
+                    }
                 }
                 _ =>
                 {}
