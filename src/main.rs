@@ -700,7 +700,12 @@ fn main()
                         ln = (line, placement);
                     }
                 }
-                '\x1A' => mode = Default, //esc
+                '\x1A' =>
+                {
+                    //esc
+                    mode = Default;
+                    err.clear();
+                }
                 '`' if mode == Default && n + 1 != files.len() =>
                 {
                     //next file
@@ -905,7 +910,17 @@ fn main()
                     if let Ok(file_path) = get_word(&mut stdout, height)
                     {
                         let j = n;
-                        let path = canonicalize(&file_path).unwrap();
+                        let path = match canonicalize(&file_path)
+                        {
+                            Ok(n) => n,
+                            Err(e) =>
+                            {
+                                err = e.to_string();
+                                print_line_number(height, line, placement, top, start, err.clone());
+                                stdout.flush().unwrap();
+                                continue;
+                            }
+                        };
                         for (index, file) in files.iter().enumerate()
                         {
                             if canonicalize(&file.save_file_path).unwrap() == path
