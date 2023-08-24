@@ -256,6 +256,51 @@ fn main()
                         word.pop();
                     }
                 }
+                '\x06' =>
+                {
+                    //Delete
+                    saved = false;
+                    if placement == files[n].lines[line].len()
+                    {
+                        if line + 1 == files[n].lines.len()
+                        {
+                            continue;
+                        }
+                        let t = files[n].lines.remove(line + 1);
+                        files[n].lines[line].extend(t);
+                        start = fix_top(start, placement, width);
+                        clear(&files[n].lines, top, height, start, width);
+                        print!("\x1b[E\x1b[G\x1b[K");
+                        fix_history(&mut files[n].history);
+                        files[n].history.list.insert(
+                            0,
+                            Point {
+                                add: false,
+                                split: true,
+                                pos: (line, placement),
+                                char: '\0',
+                                line: None,
+                            },
+                        )
+                    }
+                    else
+                    {
+                        fix_history(&mut files[n].history);
+                        let ln = files[n].lines[line].remove(placement);
+                        files[n].history.list.insert(
+                            0,
+                            Point {
+                                add: false,
+                                split: false,
+                                pos: (line, placement),
+                                char: ln,
+                                line: None,
+                            },
+                        );
+                        clear(&files[n].lines, top, height, start, width);
+                    }
+                    files[n].cursor = placement;
+                }
                 '\x15' if (mode == Edit || mode == Digraph) && placement != 0 =>
                 {
                     //ctrl+back

@@ -115,6 +115,7 @@ pub fn read_single_char() -> char
             (KeyCode::End, KeyModifiers::NONE) => '\x02',
             (KeyCode::Home, KeyModifiers::NONE) => '\x01',
             (KeyCode::Insert, KeyModifiers::NONE) => '\x05',
+            (KeyCode::Delete, KeyModifiers::NONE) => '\x06',
             (KeyCode::Tab, KeyModifiers::NONE) => '\t',
             _ => '\0',
         },
