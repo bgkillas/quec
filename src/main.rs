@@ -16,6 +16,7 @@ use std::{
     env::{args, var},
     fs::{canonicalize, create_dir},
     io::{stdout, Write},
+    time::Instant,
 };
 fn main()
 {
@@ -100,6 +101,7 @@ fn main()
         let mut ln: (usize, usize) = (0, 0);
         let mut orig: (usize, usize) = (0, 0);
         let mut word: Vec<char> = Vec::new();
+        let mut time;
         loop
         {
             if (height, width) != get_dimensions()
@@ -117,6 +119,7 @@ fn main()
             {
                 files[n].history.list.clear();
             }
+            time = Instant::now();
             let c = read_single_char();
             match c
             {
@@ -127,17 +130,26 @@ fn main()
                     {
                         saved = false;
                         line += 1;
-                        let mut ln: Vec<char> = files[n].lines[line - 1][..placement]
-                            .iter()
-                            .take_while(|&&c| c == ' ' || c == '\t')
-                            .cloned()
-                            .collect();
-                        let count = ln.len();
-                        ln.extend::<Vec<char>>(
-                            files[n].lines[line - 1].drain(placement..).collect(),
-                        );
-                        files[n].lines.insert(line, ln);
-                        placement = count;
+                        if time.elapsed().as_millis() != 0
+                        {
+                            let mut ln: Vec<char> = files[n].lines[line - 1][..placement]
+                                .iter()
+                                .take_while(|&&c| c == ' ' || c == '\t')
+                                .cloned()
+                                .collect();
+                            let count = ln.len();
+                            ln.extend::<Vec<char>>(
+                                files[n].lines[line - 1].drain(placement..).collect(),
+                            );
+                            files[n].lines.insert(line, ln);
+                            placement = count
+                        }
+                        else
+                        {
+                            let ln = files[n].lines[line - 1].drain(placement..).collect();
+                            files[n].lines.insert(line, ln);
+                            placement = 0;
+                        }
                         files[n].cursor = placement;
                         start = 0;
                         if line == height + top
