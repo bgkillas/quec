@@ -100,7 +100,7 @@ impl Point
             let len = byte(bytes, cursor);
             cursor += 8;
             let line_string = std::str::from_utf8(&bytes[cursor..cursor + len])
-                .unwrap()
+                .unwrap_or("")
                 .to_string();
             Some(line_string.chars().collect())
         }
